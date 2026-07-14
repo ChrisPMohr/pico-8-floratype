@@ -1,0 +1,6 @@
+- [ ] Use alternate palette
+- [ ] Other screens
+	- [ ] Farmer's market
+	- [ ] Competition
+- [ ] Use IRL time
+- [ ] Tools?
