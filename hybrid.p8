@@ -86,17 +86,21 @@ function move_cursor()
 end
 
 function click_button()
-	if not on_field and btnp(🅾️) then
-		if bc_x == 0 then
-			generate_and_place_flower(0)
-		elseif bc_x == 1 then
-			generate_and_place_flower(1)
-		elseif bc_x == 2 then
-			kill_flower()
-		elseif bc_x == 3 then
-			time_passes()
-		elseif bc_x == 4 then
-			save_game()
+	if btnp(🅾️) then
+		if on_field then
+			if bc_x == 0 then
+				generate_and_place_flower(0)
+			elseif bc_x == 1 then
+				generate_and_place_flower(1)
+			elseif bc_x == 2 then
+				kill_flower()
+			end
+		else
+			if bc_x == 3 then
+				time_passes()
+			elseif bc_x == 4 then
+				save_game()
+			end
 		end
 	end
 end
@@ -154,18 +158,16 @@ function draw_cursor()
 			end
 		end
 	end
-	if atn % 32 < 20 then
-		if not on_field then
-			for fx=0,1 do
-				for fy=0,1 do
-					spr(
-						1,
-						bc_x*16 + fx*8,
-						112 + fy*8,
-						1,1,
-						fx == 1,
-						fy == 1)
-				end
+	if atn % 32 < 20 or on_field then
+		for fx=0,1 do
+			for fy=0,1 do
+				spr(
+					1,
+					bc_x*16 + fx*8,
+					112 + fy*8,
+					1,1,
+					fx == 1,
+					fy == 1)
 			end
 		end
 	end
