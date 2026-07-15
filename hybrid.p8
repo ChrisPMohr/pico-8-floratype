@@ -511,7 +511,7 @@ end
 function find_child_spaces(x,y,dx,dy)
 	--find all available child spaces spaces
 	local child_spaces={}
-	if abs(dx) + abs(dy) == 0 then
+	if abs(dx) + abs(dy) == 1 then
 		if abs(dx) == 1 then
 			-- neighbors in cardinal directions
 			for dx2=0,dx,dx do
