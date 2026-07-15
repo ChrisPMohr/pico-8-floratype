@@ -129,7 +129,7 @@ function click_button()
 			elseif bc_x == 1 then
 				generate_and_place_flower(1)
 			elseif bc_x == 2 then
-				kill_flower()
+				remove_flower_from_field()
 			end
 		else
 			if bc_x >= 0 and bc_x <= 2 then
@@ -146,22 +146,18 @@ end
 function generate_and_place_flower(flower_type)
 	if not field1:get(fc_x + 1, fc_y + 1) then
 		local flower = generate_flower(flower_type)
-		field1:place(flower, fc_x+1, fc_y+1)
-		place_flower(flower)
+		add_flower_to_field(flower, fc_x+1, fc_y+1)
 	end
 end
 
-function place_flower(flower)
+function add_flower_to_field(flower, x, y)
+	field1:place(flower, x, y)
 	create_and_place_flower_sprite(flower)
 end
 
-function kill_flower()
-	--this doesn't work well with
-	--the current sprite sheet
-	--management, since it doesn't
-	--free space there
+function remove_flower_from_field()
 	field1:place(nil, fc_x+1, fc_y+1)
-	remove_flower(fc_x+1, fc_y+1)
+	remove_flower_sprite(fc_x+1, fc_y+1)
 end
 
 function draw_ground()
@@ -263,15 +259,6 @@ function flower_class:is_compatible(flower)
 	return self.genes[1] >> 7 == flower.genes[1] >> 7
 end
 
-all_flowers = {}
-
---need a better way to maintain
---sprite state, but for now
---just keep a counter
---todo: save and load this
---this never removes any sprites
-flower_sprites = 0
-
 function generate_flower(flower_type)
 	--right now, this uses a
 	--one of two template image
@@ -296,17 +283,13 @@ function generate_flower(flower_type)
 	-- bits 2 and 3 from the left are the color
 	gene1 += c << 1
 	
-	return create_flower({gene1, 0, 0 ,0})
+	return flower_class:new({gene1, 0, 0 ,0})
 end
 
 function spr_pos(s)
 	--get sprite sheet position
 	--from sprite number
 	return s % 16 * 8, s \ 16 * 8
-end
-
-function create_flower(genes)
-	return flower_class:new(genes)
 end
 
 function breed(flower1, flower2)
@@ -327,7 +310,7 @@ function breed(flower1, flower2)
 	end
 	
 --	field_debug = gene_str(genes)
-	return genes
+	return flower_class:new(genes)
 end
 
 function gene_str(genes)
@@ -387,7 +370,7 @@ function create_and_place_flower_sprite(flower)
 	)
 end
 
-function remove_flower(x, y)
+function remove_flower_sprite(x, y)
 	--the bottom of extended sprite sheet 0
 	--should be empty, so copy 0s from there
 	--i think this is more efficient than
@@ -493,9 +476,8 @@ function time_passes()
 		--create a new flower
 		if #neighbors > 0 then
 			local neighbor,cx,cy = unpack(rnd(neighbors))
-			local child = create_flower(breed(flower, neighbor))
-			field1:place(child, cx, cy)
-			place_flower(child)
+			local child = breed(flower, neighbor)
+			add_flower_to_field(child, cx, cy)
 		else
 			local clone_spaces = {}
 			for dx=-1,1 do
@@ -510,9 +492,8 @@ function time_passes()
 			end
 			if #clone_spaces > 0 then
 				local cx, cy = unpack(rnd(clone_spaces))
-				local child = create_flower(flower.genes)
-				field1:place(child, cx, cy)
-				place_flower(child)
+				local child = flower_class:new(flower.genes)
+				add_flower_to_field(child, cx, cy)
 			end
 		end
 	end

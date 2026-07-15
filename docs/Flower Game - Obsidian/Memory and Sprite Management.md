@@ -76,13 +76,13 @@ I think representing placement in RAM will be a consequence of whatever data str
 #### Cleanup steps
 - [ ] Adjust field (and button?) cursor indexing to be 1 based
 - [ ] Try switching genes to single 32 bit value instead of table
-- [ ] Remove/refactor/rename functions with overlapping uses
-	- [ ] create_flower
-	- [ ] field1:place
-	- [ ] place_flower
-	- [ ] create_and_place_flower_sprite
-	- [ ] kill_flower
-	- [ ] remove_flower
+- [x] Remove/refactor/rename functions with overlapping uses
+	- [x] create_flower
+	- [x] field1:place
+	- [x] place_flower
+	- [x] create_and_place_flower_sprite
+	- [x] kill_flower
+	- [x] remove_flower
 
 
 ### Functions to Change
