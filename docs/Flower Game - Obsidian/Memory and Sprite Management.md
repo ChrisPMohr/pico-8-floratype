@@ -37,7 +37,7 @@ I think representing placement in RAM will be a consequence of whatever data str
 ## Design
 
 ### Migration Order
-* Switch out gene storage from flags -> LUA data
+* Switch out gene storage from flags and placement from map -> LUA data
 	- [x] generate_and_place_flower
 	- [x] generate_flower
 	- [x] place_flower
@@ -52,22 +52,29 @@ I think representing placement in RAM will be a consequence of whatever data str
 		- [x] Not necessary- read field directly
 
 * Switch out sprite storage from default page -> generated in extended memory
-	- [ ] generate_and_place_flower
-	- [ ] generate_flower
-	- [ ] place_flower
+	- [x] generate_and_place_flower
+		- [x] doesn't directly affect sprites
+	- [x] generate_flower
+		- [x] doesn't directly affect sprites
+	- [ ] create flower
+		- [ ] I don't think we need to generate the sprite until we place the flower
+		- [ ] Step 2 - remove writes to sprite map
+	- [x] place_flower
+		- [x] Step 1 - generate sprite and write to extended sprite sheet
 	- [ ] kill_flower
-	- [ ] draw_flowers
-	- [ ] time_passes (and all nested calls)
-	- [ ] breed
-	- [ ] is_compatible
-	- [ ] get_genes
+		- [x] Step 1 - Write blanks to the extended sprite sheet
+		- [ ] Step 2 - Remove writes to map
+	- [x] draw_flowers
+		- [x] Step 1 - Draw extended sprite sheet 
+	- [x] time_passes (and all nested calls)
+		- [x] Validate that this is using updated methods above correctly
 * Rewrite save tool - actually two pieces of functionality
 	* New implementation that exports a field worth of sprite and genes to the spritesheet
 	* Cart storage / loading of genome data
 
 #### Cleanup steps
 - [ ] Adjust field (and button?) cursor indexing to be 1 based
-- [ ] 
+- [ ] Try switching genes to single 32 bit value instead of table
 
 ### Functions to Change
 ```
