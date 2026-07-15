@@ -74,8 +74,8 @@ end
 
 function init_field_screen()
 	on_field = true
-	fc_x, fc_y = 0, 0
-	bc_x = 0
+	fc_x, fc_y = 1, 1
+	bc_x = 1
 	field_debug = ""
 	field1 = field_class:new(1)
 end
@@ -100,23 +100,23 @@ function move_cursor()
 	end
 	if on_field then
 		if btnp(⬆️) then
-			fc_y = max(0, fc_y-1)
+			fc_y = max(1, fc_y-1)
 		end
 		if btnp(⬇️) then
-			fc_y = min(6, fc_y+1)
+			fc_y = min(7, fc_y+1)
 		end
 		if btnp(⬅️) then
-			fc_x = max(0, fc_x-1)
+			fc_x = max(1, fc_x-1)
 		end
 		if btnp(➡️) then
-			fc_x = min(7, fc_x+1)
+			fc_x = min(8, fc_x+1)
 		end
 	else
 		if btnp(⬅️) then
-			bc_x = max(0, bc_x-1)
+			bc_x = max(1, bc_x-1)
 		end
 		if btnp(➡️) then
-			bc_x = min(4, bc_x+1)
+			bc_x = min(5, bc_x+1)
 		end
 	end
 end
@@ -124,19 +124,19 @@ end
 function click_button()
 	if btnp(🅾️) then
 		if on_field then
-			if bc_x == 0 then
+			if bc_x == 1 then
 				generate_and_place_flower(0)
-			elseif bc_x == 1 then
-				generate_and_place_flower(1)
 			elseif bc_x == 2 then
+				generate_and_place_flower(1)
+			elseif bc_x == 3 then
 				remove_flower_from_field()
 			end
 		else
-			if bc_x >= 0 and bc_x <= 2 then
+			if bc_x >= 1 and bc_x <= 3 then
 				on_field = true
-			elseif bc_x == 3 then
-				time_passes()
 			elseif bc_x == 4 then
+				time_passes()
+			elseif bc_x == 5 then
 				save_game()
 			end
 		end
@@ -144,9 +144,9 @@ function click_button()
 end
 
 function generate_and_place_flower(flower_type)
-	if not field1:get(fc_x + 1, fc_y + 1) then
+	if not field1:get(fc_x, fc_y) then
 		local flower = generate_flower(flower_type)
-		add_flower_to_field(flower, fc_x+1, fc_y+1)
+		add_flower_to_field(flower, fc_x, fc_y)
 	end
 end
 
@@ -156,8 +156,8 @@ function add_flower_to_field(flower, x, y)
 end
 
 function remove_flower_from_field()
-	field1:place(nil, fc_x+1, fc_y+1)
-	remove_flower_sprite(fc_x+1, fc_y+1)
+	field1:place(nil, fc_x, fc_y)
+	remove_flower_sprite(fc_x, fc_y)
 end
 
 function draw_ground()
@@ -183,8 +183,8 @@ function draw_cursor()
 			for fy=0,1 do
 				spr(
 					1,
-					fc_x*16 + fx*8,
-					fc_y*16 + fy*8,
+					fc_x*16 - 16 + fx*8,
+					fc_y*16 - 16 + fy*8,
 					1,1,
 					fx == 1,
 					fy == 1)
@@ -196,7 +196,7 @@ function draw_cursor()
 			for fy=0,1 do
 				spr(
 					1,
-					bc_x*16 + fx*8,
+					bc_x*16 - 16 + fx*8,
 					112 + fy*8,
 					1,1,
 					fx == 1,
@@ -448,7 +448,7 @@ function time_passes()
 		
 	--shuffle the order they're
 	--processed in
-	for i=#breeding,1,-1 do
+	for i=#breeding,2,-1 do
 		local j=flr(rnd(i)) + 1
 		breeding[i],breeding[j]=breeding[j],breeding[i]
 	end
