@@ -1,0 +1,7 @@
+- [x] Cursor allow moving to greater rows/cols
+- [x] Flowers draw in the correct place
+	- [x] "Camera" concept
+- [x] Cursor draws in the right place
+- [x] Move flowers as camera moves
+- [x] Draw new flower in newly seen row
+- [ ] Animation

@@ -36,6 +36,34 @@ end
 
 
 -->8
+--utils
+
+function unpacks(s)
+	return unpack(split(s))
+end
+
+
+-- copies a sprite from x0,y0
+--   (from spritesheet based at
+--   memory address base0)
+--   into x1,y1 on the spritesheet
+--   based at address base1
+-- set base1 to 0x6000 to use the
+--   screen as the destination
+-- all coordinates are measured
+--   in pixels
+-- note! odd x-coordinates will
+--   be rounded down
+-- by pancelor
+function blit(base1,x1,y1,base0,x0,y0, w,h)
+ local a0=base0+y0*64+x0\2 --source
+ local a1=base1+y1*64+x1\2 --destination
+ local w2=w and w\2 or 4   --half-width
+ for da=0,(h or 8)*64-1,64 do
+  memcpy(a1+da,a0+da,w2)
+ end
+end
+-->8
 --field screen
 
 field_class = {}
@@ -43,9 +71,9 @@ field_class.__index = field_class
 
 function field_class:new(n)
 	local flowers = {}
-	for y=1,7 do
+	for y=1,f_max_y do
 		row = {}
-		for x=1,8 do
+		for x=1,f_max_x do
 			add(row, nil)
 		end
 		add(flowers, row)
@@ -72,9 +100,19 @@ function field_class:get(x, y)
 	return self.flowers[y][x]
 end
 
+--this assumes the same max dimensions
+--for every field
+function check_field_bounds(x,y)
+	return x >=1 and x <= f_max_x and y >= 1 and y <= f_max_y
+end
+
 function init_field_screen()
 	on_field = true
 	fc_x, fc_y = 1, 1
+	--camera coords represent top
+	--left corner of current view
+	fcam_x, fcam_y = 1, 1
+	f_max_x,f_max_y = 10, 10
 	bc_x = 1
 	field_debug = ""
 	field1 = field_class:new(1)
@@ -111,8 +149,21 @@ function move_cursor()
 		if btnp(➡️) then
 			fc_x += 1
 		end
-		fc_y = mid(1,fc_y,7)
-		fc_x = mid(1,fc_x,8)
+		fc_y = mid(1,fc_y,f_max_y)
+		fc_x = mid(1,fc_x,f_max_x)
+		
+		if fc_y > fcam_y + 6 then
+			move_camera_down()
+		end
+		if fc_y < fcam_y then
+			move_camera_up()
+		end
+		if fc_x > fcam_x + 7 then
+			move_camera_right()
+		end
+		if fc_x < fcam_x then
+			move_camera_left()
+		end
 	else
 		if btnp(⬅️) then
 			bc_x -= 1
@@ -121,6 +172,74 @@ function move_cursor()
 			bc_x += 1
 		end
 		bc_x = mid(1,bc_x,5)
+	end
+end
+
+function move_camera_down()
+	fcam_y += 1
+	for y=0,80,16 do
+		blit(
+			0x8000,0,y,
+			0x8000,0,y+16,
+			128,16)
+	end
+	sync_flower_sprites_row(fcam_y+6)
+end
+
+function move_camera_up()
+	fcam_y -= 1
+	for y=80,0,-16 do
+		blit(
+			0x8000,0,y+16,
+			0x8000,0,y,
+			128,16)
+	end
+	sync_flower_sprites_row(fcam_y)
+end
+
+function move_camera_right()
+	fcam_x += 1
+	for x=0,96,16 do
+		blit(
+			0x8000,x,0,
+			0x8000,x+16,0,
+			16,128)
+	end
+	sync_flower_sprites_col(fcam_x+7)
+end
+
+function move_camera_left()
+	fcam_x -= 1
+	for x=96,0,-16 do
+		blit(
+			0x8000,x+16,0,
+			0x8000,x,0,
+			16,128)
+	end
+	sync_flower_sprites_col(fcam_x)
+end
+
+function sync_flower_sprites_row(y)
+	for dx=0,7 do
+		sync_flower_sprite(fcam_x+dx,y)
+	end
+end
+
+function sync_flower_sprites_col(x)
+	for dy=0,6 do
+		sync_flower_sprite(x,fcam_y+dy)
+	end
+end
+
+--syncs sprite to spritesheet for
+--flower or empty space at actual
+--(not camera) coords x,y
+function sync_flower_sprite(x,y)
+	local flower = field1:get(x,y)
+	if flower then
+		create_and_place_flower_sprite(flower)
+	else
+		remove_flower_sprite(x,y)
 	end
 end
 
@@ -186,8 +305,8 @@ function draw_cursor()
 			for fy=0,1 do
 				spr(
 					1,
-					fc_x*16 - 16 + fx*8,
-					fc_y*16 - 16 + fy*8,
+					(fc_x - fcam_x)*16 + fx*8,
+					(fc_y - fcam_y)*16 + fy*8,
 					1,1,
 					fx == 1,
 					fy == 1)
@@ -356,16 +475,19 @@ function create_flower_sprite(flower)
 end
 
 function create_and_place_flower_sprite(flower)
-	create_flower_sprite(flower)
-	--copy sprite to correct location in
-	--extended sprite sheet 0
-	blit(
-		0x8000,
-		(flower.x - 1) * 16, (flower.y - 1) * 16,
-		0x0000,
-		swap_x, swap_y,
-		16, 16
-	)
+	local screen_x, screen_y = flower.x - fcam_x, flower.y - fcam_y
+	if screen_x >= 0 and screen_x <= 7 and screen_y >= 0 and screen_y <= 6 then
+		create_flower_sprite(flower)
+		--copy sprite to correct location in
+		--extended sprite sheet 0
+		blit(
+			0x8000,
+			screen_x * 16, screen_y * 16,
+			0x0000,
+			swap_x, swap_y,
+			16, 16
+		)
+	end
 end
 
 function remove_flower_sprite(x, y)
@@ -379,37 +501,16 @@ function remove_flower_sprite(x, y)
 	--can refactor to save tokens
 	blit(
 		0x8000,
-		(x - 1) * 16, (y - 1) * 16,
+		(x - fcam_x) * 16, (y - fcam_y) * 16,
 		0x8000,
 		0, 112,
 		16, 16
 	)
 end
-
--- copies a sprite from x0,y0
---   (from spritesheet based at
---   memory address base0)
---   into x1,y1 on the spritesheet
---   based at address base1
--- set base1 to 0x6000 to use the
---   screen as the destination
--- all coordinates are measured
---   in pixels
--- note! odd x-coordinates will
---   be rounded down
--- by pancelor
-function blit(base1,x1,y1,base0,x0,y0, w,h)
- local a0=base0+y0*64+x0\2 --source
- local a1=base1+y1*64+x1\2 --destination
- local w2=w and w\2 or 4   --half-width
- for da=0,(h or 8)*64-1,64 do
-  memcpy(a1+da,a0+da,w2)
- end
-end
 -->8
 --flower breeding
 
-breed_rate = 20
+breed_rate = 100
 
 function time_passes()
 	--flowers are currently always
@@ -432,8 +533,8 @@ function time_passes()
 	--make a list of flowers that will
 	--breed
 	breeding = {}
-	for x=1,8 do
-		for y=1,7 do
+	for x=1,f_max_x do
+		for y=1,f_max_y do
 			local flower = field1:get(x,y)
 			if flower then
 				if rnd(100) < breed_rate then
@@ -491,10 +592,6 @@ function time_passes()
 	end
 end
 
-function check_field_bounds(x,y)
-	return x >=1 and x <=8 and y >= 1 and y <= 7
-end
-
 function intersection(coords1, coords2)
 	local ins = {}
 	for coords,_ in pairs(coords1) do
@@ -521,9 +618,6 @@ function generate_neighbors(x,y)
 	return coords
 end
 
-function unpacks(s)
-	return unpack(split(s))
-end
 __gfx__
 00000000777000000000000000000000000000000000000000000000000000000080020000cccc008000000800777700d6656d00000000000000000000000000
 0000000070000000000000000000000000000000000000000000000000000000008822000cccccc00800008007775770d6656dd0000000000000000000000000
