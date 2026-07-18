@@ -1,0 +1,5 @@
+- [ ] Move to future/past? months
+- [ ] Custom font for dates and/or month
+- [ ] Actually populate something on the calendar
+- [ ] Possible token saves
+	- [ ] Reuse cursor moving code

@@ -3,24 +3,31 @@ version 43
 __lua__
 function _init()
 	--modes/screens of the game:
-	--1 field screen
-	mode = 1
+	--1 field
+	--2 calendar
 	atn, atx = 0, 32
 	memset(0x8000, 0, 0x4000)
 	cls()
 	init_field_screen()
+	init_calendar_screen()
+	
+	start_field_screen()
 end
 
 function _update()
 	atn = (atn + 1) % atx
 	if mode == 1 then
 		update_field_screen()
+	elseif mode == 2 then
+		update_calendar_screen()
 	end
 end
 
 function _draw()
 	if mode == 1 then
 		draw_field_screen()
+	elseif mode == 2 then
+		draw_calendar_screen()
 	end
 end
 
@@ -110,23 +117,27 @@ function init_field_screen()
 	-- make sprite 0 opaque in the map
 	poke(0x5f36,0x08)
 	
-	on_field = true
-	fc_x, fc_y = 1, 1
 	--camera coords represent top
 	--left corner of current view
 	fcam_x, fcam_y = 1, 1
 	f_max_x,f_max_y = 16, 16
-	animation = nil
-	a_frame = 0
-	anim_dx, anim_dy = 0 ,0
 	bc_x = 1
 	field_debug = ""
 	field1 = field_class:new(1)
 end
 
+function start_field_screen()
+	mode = 1
+	on_field = true
+	fc_x, fc_y = fcam_x+3, fcam_y+3
+	animation = nil
+	a_frame = 0
+	anim_dx, anim_dy = 0 ,0
+end
+
 function update_field_screen()
 	if not animation then
-		move_cursor()
+		move_field_cursor()
 		click_button()
 	end
 	if animation then
@@ -136,7 +147,7 @@ end
 
 function draw_field_screen()
 	cls()
-	clip(0, 0, 128, 112)
+	clip(unpacks"0,0,128,112")
 	camera(anim_dx, anim_dy)
 	draw_ground()
 	draw_flowers()
@@ -158,7 +169,7 @@ function stop_animation()
 	anim_dx, anim_dy = 0, 0
 end
 
-function move_cursor()
+function move_field_cursor()
 	if btnp(❎) then
 		on_field = not on_field
 	end
@@ -194,7 +205,7 @@ function move_cursor()
 		if btnp(➡️) then
 			bc_x += 1
 		end
-		bc_x = mid(1,bc_x,5)
+		bc_x = mid(1,bc_x,6)
 	end
 end
 
@@ -326,6 +337,8 @@ function click_button()
 			elseif bc_x == 4 then
 				time_passes()
 			elseif bc_x == 5 then
+				start_calendar_screen()
+			elseif bc_x == 6 then
 				save_game()
 			end
 		end
@@ -358,24 +371,24 @@ function draw_ground()
 	end
 	
 	-- 1 pixel outline
---	if fcam_y == 1 then
---		line(-16,0,144,0,3)
---	end
---	if fcam_y + 6 == f_max_y then
---		line(-16,111,144,111,3)
---	end
---	if fcam_x == 1 then
---		line(0,-16,0,128,3)
---	end
---	if fcam_x + 7 == f_max_x then
---		line(127,-16,127,128,3)
---	end
+	if fcam_y == 1 then
+		line(unpacks"-16,0,144,0,15")
+	end
+	if fcam_y + 6 == f_max_y then
+		line(unpacks"-16,111,144,111,15")
+	end
+	if fcam_x == 1 then
+		line(unpacks"0,-16,0,128,15")
+	end
+	if fcam_x + 7 == f_max_x then
+		line(unpacks"127,-16,127,128,15")
+	end
 end
 
 function draw_flowers()
 -- switch sprite sheet to extended sheet 0
 	poke(0x5f54,0x80)
-	map(0,0,-16,-16,20,18)
+	map(unpacks"0,0,-16,-16,20,18")
 -- switch sprite sheet back to default
 	poke(0x5f54,0x00)
 end
@@ -418,6 +431,7 @@ function draw_buttons()
 	draw_button(10, 2)
 	draw_button(11, 3)
 	draw_button(12, 4)
+	draw_button(13, 5)
 end
 
 function draw_button(s, bx)
@@ -427,11 +441,18 @@ function draw_button(s, bx)
 		14, 14,
 		4,
 		15)
+--	rrectfill(
+--		x+1,
+--		unpacks"113,14,14,4,15")
 	rrect(
-		x+1, 113,
+		x+1,
+		113,
 		14, 14,
 		4,
 		4)
+--	rrect(
+--		x+1,
+--		unpacks"113,14,14,4,4")
 	spr(s,x+4,116)
 end
 -->8
@@ -703,15 +724,116 @@ function generate_neighbors(x,y)
 	return coords
 end
 
+-->8
+--calendar screen
+
+function init_calendar_screen()
+	days_of_week = split"mon,tue,wed,thu,fri,sat,sun"
+	days_in_month = split"31,28,31,30,31,30,31,31,30,31,30,31"
+	months = split"january,february,march,april,may,june,july,august,september,october,november,december"
+	current_y,current_m,current_d = get_current_date()
+end
+
+function start_calendar_screen()
+	mode = 2
+	y,m,d=current_y,current_m,current_d
+	cc_x,cc_y = 0,0
+	--6 row month for test
+--	local y,m,d=2026,8,12
+	--longest month name for test
+--	local y,m,d=2026,9,12
+end
+
+function update_calendar_screen()
+	if btnp(❎) then
+		start_field_screen()
+	end
+	if btnp(⬆️) then
+		cc_y -= 1
+	elseif btnp(⬇️) then
+		cc_y += 1
+	elseif btnp(⬅️) then
+		cc_x -= 1
+	elseif btnp(➡️) then
+		cc_x += 1
+	end
+	cc_y = mid(0,cc_y,5)
+	cc_x = mid(0,cc_x,6)
+end
+
+function draw_calendar_screen()
+	draw_calendar()
+	draw_calendar_cursor()
+end
+
+function draw_calendar()
+	rect(unpacks"0,0,127,127,4")
+	rectfill(unpacks"1,1,126,126,15")
+	rect(unpacks"4,4,123,123,4")
+	rectfill(unpacks"5,5,122,18,14")
+	line(unpacks"5,19,122,19,0")
+	rectfill(unpacks"5,20,122,122,7")
+	
+	for y=27,107,16 do
+		line(5,y,122,y,0)
+	end
+	
+	for x=21,106,17 do
+		line(x,19,x,122,0)
+	end
+	
+	for i=1,7 do
+		print(days_of_week[i], -10+17*i, 21)
+	end
+	
+	local first_day = get_day_of_week(y,m,1)
+	
+	--we could center this text, but probably not worth it
+	print("\^w\^t"..months[m].." "..y,10,7,7)
+	
+	for j=0,5 do
+		for i=0,6 do
+			local date = get_date_from_coord(i,j,first_day)
+			local x,y=5+i*17,28+j*16
+			if date <= 0 or date > days_in_month[m] then
+				rectfill(x,y,x+15,y+14,5)
+			else
+				print(date,x+1,y+1,date == d and 8 or 0)
+				spr(date % 2 == 0 and 8 or 13,x+7,y+6)
+			end
+		end
+	end
+end
+
+function draw_calendar_cursor()
+	local x1,y1=4+cc_x*17,27+cc_y*16
+	rect(x1,y1,x1+17,y1+16,14)
+end
+
+function get_date_from_coord(i,j,first_day)
+	return i+j*7 - first_day + 2
+end
+
+function get_current_date()
+	return stat(90), stat(91), stat(92)
+end
+
+function get_day_of_week(y,m,d)
+	local t = split"0,3,2,5,0,3,5,1,4,6,2,4"
+	if m < 3 then
+		y -= 1
+	end
+	return (y + y\4 - y\100 + y\400 + t[m] + d) % 7 + 1
+end
 __gfx__
-00000000777000000000000000000000000000000000000000000000000000000080020000cccc008000000800777700d6656d00000000000000000000000000
-0000000070000000000000000000000000000000000000000000000000000000008822000cccccc00800008007775770d6656dd0000000000000000000000000
-0070070070000000000000000000000000000000000000000000000000000000088882200cc99cc00080080077775777d6666ddd000000000000000000000000
-0007700000000000000000000000000000000000000000000000000000000000088888200cc99cc00008800077775777dddddddd000000000000000000000000
-0007700000000000000000000000000000000000000000000000000000000000088888800cccccc00008800077555777d666666d000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000088880000cccc000080080077777777d655556d000000000000000000000000
-000000000000000000000000000000000000000000000000000000000000000000033000000330000800008007777770d666666d000000000000000000000000
-000000000000000000000000000000000000000000000000000000000000000000033000000330008000000800777700d666666d000000000000000000000000
+00000000777000000000000000000000000000000000000000000000000000000080020000cccc008000000800777700eeeeeeeed6656d000000000000000000
+0000000070000000000000000000000000000000000000000000000000000000008822000cccccc00800008007775770eeeeeeeed6656dd00000000000000000
+0070070070000000000000000000000000000000000000000000000000000000088882200cc99cc0008008007777577777777777d6666ddd0000000000000000
+0007700000000000000000000000000000000000000000000000000000000000088888200cc99cc0000880007777577777755777dddddddd0000000000000000
+0007700000000000000000000000000000000000000000000000000000000000088888800cccccc0000880007755577777775777d666666d0000000000000000
+00700700000000000000000000000000000000000000000000000000000000000088880000cccc00008008007777777777775777d655556d0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000003300000033000080000800777777066755577d666666d0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000003300000033000800000080077770076777777d666666d0000000000000000
 4444f444000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 44444444000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 44f44444000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -897,7 +1019,7 @@ __label__
 77700000000007770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
 __map__
-0000e0e1e2e3e4e5e6e7e8e9eaebecedeeef0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000e0e1e2e3e4e5e6e7e8e9eaeb00edeeef0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 e0e1000102030405060708090a0b0c0d0e0fe0e1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 f0f1101112131415161718191a1b1c1d1e1ff0f1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
