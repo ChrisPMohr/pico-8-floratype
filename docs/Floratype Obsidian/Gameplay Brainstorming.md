@@ -6,4 +6,5 @@
 	* Harvest flowers
 	* Sell flowers (only some days?)
 * What does the first play session look like?
-	* 
+	* You could start with some particular flowers, and start with a special order for the next day
+	* Tutorials for this 
