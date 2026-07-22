@@ -43,12 +43,21 @@ function save_game()
 	--sync field state to sprite memory
 	--save to cart
 	--reserve the first 4 bytes for future use
+	poke4(0x1000,0xabad.babe)
 	local end_addr = field1:save(0x1004)
 	assert(end_addr < 0x2000,"tried to save too much memory "..end_addr)
 	
 	cstore(0x1000,0x1000,0x1000,"floratype_save.p8")
 end
 
+function load_game()
+	reload(0x1000,0x1000,0x1000,"floratype_save.p8")
+	field1 = field_class:load(0x1004)
+	init_field_screen()
+	for y=1,f_max_y do
+		sync_flower_sprites_row(y)
+	end
+end
 
 -->8
 --utils
@@ -89,6 +98,8 @@ end
 field_class = {}
 field_class.__index = field_class
 
+empty_flower_magic_number = 0xbaaa.aaad
+
 function field_class:new(n)
 	local flowers = {}
 	for y=1,f_max_y do
@@ -105,6 +116,20 @@ function field_class:new(n)
 			flowers=flowers
 		},
 		self)
+end
+
+function field_class:load(addr)
+	local field = field_class:new(1)
+	for y = 1,f_max_y do
+		for x = 1,f_max_x do
+			local genes = $addr
+			if genes != empty_flower_magic_number then
+				field:place(flower_class:new(genes), x, y)
+			end
+			addr += 4
+		end
+	end
+	return field, addr
 end
 
 function field_class:place(flower, x, y)
@@ -128,10 +153,10 @@ function field_class:save(addr)
 			if f then
 				bytes = f.genes
 			else
-				bytes = 0xbaaa.aaad
+				bytes = empty_flower_magic_number
 			end
 			poke4(addr, bytes)
-			addr += 1
+			addr += 4
 		end
 	end
 	return addr
@@ -153,7 +178,9 @@ function init_field_screen()
 	f_max_x,f_max_y = 16, 16
 	bc_x = 1
 	field_debug = ""
-	field1 = field_class:new(1)
+	if field1 == nil then
+		field1 = field_class:new(1)
+	end
 	selected_tool, selected_seed = 0, 0
 end
 
@@ -290,6 +317,8 @@ function click_button()
 							start_calendar_screen()
 						elseif i == 2 then
 							save_game()
+						elseif i == 3 then
+							load_game()
 						end
 					end)
 			end
