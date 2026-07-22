@@ -11,7 +11,8 @@ function _init()
 	init_field_screen()
 	init_calendar_screen()
 	
-	start_field_screen()
+--	start_field_screen()
+	start_calendar_screen()
 end
 
 function _update()
@@ -832,20 +833,9 @@ function draw_calendar_screen()
 end
 
 function draw_calendar()
-	rect(unpacks"0,0,127,127,4")
-	rectfill(unpacks"1,1,126,126,15")
-	rect(unpacks"4,4,123,123,4")
+	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
 	rectfill(unpacks"5,5,122,18,14")
-	line(unpacks"5,19,122,19,0")
-	rectfill(unpacks"5,20,122,122,7")
-	
-	for y=27,107,16 do
-		line(5,y,122,y,0)
-	end
-	
-	for x=21,106,17 do
-		line(x,19,x,122,0)
-	end
+	draw_filled_rrect(unpacks"4,19,120,15,0,0,7")
 	
 	for i=1,7 do
 		print(days_of_week[i], -10+17*i, 21)
@@ -859,15 +849,19 @@ function draw_calendar()
 	for j=0,5 do
 		for i=0,6 do
 			local date = get_date_from_coord(i,j,first_day)
-			local x,y=5+i*17,28+j*16
+			local x,y,c=4+i*17,27+j*16,7
 			if date <= 0 or date > days_in_month[m] then
-				rectfill(x,y,x+15,y+14,5)
-			else
-				print(date,x+1,y+1,date == d and 8 or 0)
-				spr(date % 2 == 0 and 8 or 13,x+7,y+6)
+				c = 5
+			end
+			draw_filled_rrect(x,y,18,17,0,0,c)
+			if c != 5 then
+				print(date,x+2,y+2,date == d and 8 or 0)
+				spr(date % 2 == 0 and 10 or 24,x+9,y+8)
 			end
 		end
 	end
+	
+	rect(unpacks"4,4,123,123,4")
 end
 
 function draw_calendar_cursor()
@@ -892,6 +886,7 @@ function get_day_of_week(y,m,d)
 	return (y + y\4 - y\100 + y\400 + t[m] + d) % 7 + 1
 end
 -->8
+--menus
 
 menu_is_open = false
 
@@ -901,9 +896,9 @@ function open_seed_menu(on_close)
 	menu_cursor_y = 1
 	--max name is 11 characters without adjusting menu size
 	available_seeds = {
-		{24,"tulip", "inf",0},
-		{25,"primrose", "inf",1},
-		{26,"trumpet", "inf",2}
+		split"24,tulip,inf,0",
+		split"25,primrose,inf,1",
+		split"26,trumpet,inf,2"
 	}
 end
 
