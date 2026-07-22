@@ -527,7 +527,7 @@ function flower_class:get_alleles(offset, size)
 end
 
 function flower_class:type()
-	return self.genes << 16 & 0b1
+	return self.genes << 16 & 0b11
 end
 
 function flower_class:color_gene()
@@ -575,9 +575,9 @@ function generate_flower(flower_type)
 	--16 gene sequences possible
 	local c = flr(rnd(16))
 
-	-- bit 1 from the right is flower type
+	-- bits 1-2 from the right is flower type
 	local genes = flower_type >>> 16
-	-- bits 7-10 from the right are the color
+	-- bits 7-10 are the color
 	genes += c >>> 10
 	
 	return flower_class:new(genes)
@@ -592,7 +592,7 @@ end
 function breed(flower1, flower2)
 	local genes, offset = 0, 0
 	--take the flower type from a parent
-	genes += flower1.genes & (0b1 >> 16)
+	genes += flower1.genes & (0b11 >> 16)
 	
 	--go gene by gene, taking one
 	--allele from each parent
@@ -617,9 +617,9 @@ local swap_x, swap_y = spr_pos(swap_sprite)
 function create_flower_sprite(flower)
 	--genetics contains 32 bits,
 	--meanings:
-	--bit 1: flower type
-	--bits 2-3: color
-	--bits 4-32: unused
+	--bit 1-2: flower type
+	--bits 7-10: color
+	--bits 11-32: unused
 	local template = 32 + flower:type() * 2
 	local c = flower:color()
 
