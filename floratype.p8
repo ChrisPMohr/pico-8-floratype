@@ -39,11 +39,13 @@ function _draw()
 	end
 end
 
+save_magic_number = 0xabad.babe
+
 function save_game()
 	--sync field state to sprite memory
 	--save to cart
 	--reserve the first 4 bytes for future use
-	poke4(0x1000,0xabad.babe)
+	poke4(0x1000,save_magic_number)
 	local end_addr = field1:save(0x1004)
 	assert(end_addr < 0x2000,"tried to save too much memory "..end_addr)
 	
@@ -52,10 +54,12 @@ end
 
 function load_game()
 	reload(0x1000,0x1000,0x1000,"floratype_save.p8")
-	field1 = field_class:load(0x1004)
-	init_field_screen()
-	for y=1,f_max_y do
-		sync_flower_sprites_row(y)
+	if $0x1000 == save_magic_number then
+		field1 = field_class:load(0x1004)
+		init_field_screen()
+		for y=1,f_max_y do
+			sync_flower_sprites_row(y)
+		end
 	end
 end
 
@@ -434,7 +438,7 @@ function draw_button(s, bx)
 		x+1, 113,
 		14, 14,
 		4,
-		4, 15)
+		4, 7)
 --	rrectfill(
 --		x+1,
 --		unpacks"113,14,14,4,15")
