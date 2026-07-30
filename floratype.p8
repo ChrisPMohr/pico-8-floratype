@@ -117,19 +117,24 @@ field_class.__index = field_class
 empty_flower_magic_numbers = {0xbaaa.aaad, 0x0}
 
 function field_class:new(n)
-	local flowers = {}
+	local flowers, weeds = {}, {}
 	for y=1,f_max_y do
-		row = {}
+		local flower_row, weed_row = {}, {}
 		for x=1,f_max_x do
-			add(row, nil)
+			add(flower_row, nil)
+			add(weed_row, false)
+--			add(weed_row, x%2 == y%2)
+--			add(weed_row, true)
 		end
-		add(flowers, row)
+		add(flowers, flower_row)
+		add(weeds, weed_row)
 	end
 
 	return setmetatable(
 		{
 			n=n,
-			flowers=flowers
+			flowers=flowers,
+			weeds=weeds
 		},
 		self)
 end
@@ -163,6 +168,17 @@ end
 function field_class:get(x, y)
 	return self.flowers[y][x]
 end
+
+function field_class:has_weeds(x,y)
+	return check_field_bounds(x,y) and self.weeds[y][x]
+end
+
+function field_class:set_weeds(v,x,y)
+	if check_field_bounds(x,y) then
+		self.weeds[y][x] = v
+	end
+end
+
 
 function field_class:save(addr)
 	for y = 1,f_max_y do
@@ -378,6 +394,9 @@ function draw_ground()
 	for x=-2,17 do
 		for y=-2,15 do
 			spr(2,x*8,y*8)
+			if field1:has_weeds(x\2 + fcam_x, y\2 + fcam_y) then
+				spr(4,x*8,y*8)
+			end
 		end
 	end
 	
@@ -711,6 +730,19 @@ function flower_class:needs_pollinator_gene()
 	return not is_recessive(self:get_alleles(4,1))
 end
 
+function flower_class:has_vigorous_gene()
+	-- vigorous (1) is recessive
+--	return self:type() == 2
+	return is_recessive(self:get_alleles(5,1))
+end
+
+function flower_class:has_weed_defense_gene()
+	-- weed defenese (0) is dominant
+--	return self:type() == 2
+	return not is_recessive(self:get_alleles(6,1))
+end
+
+
 function flower_class:is_compatible(flower)
 	return self:type() == flower:type()
 end
@@ -752,11 +784,17 @@ function generate_flower(flower_type)
 	--value is pollinator level (0-2)
 --	chr1 += 1 >> 9
 --	chr2 += 1 >> 9
-	--bit 10 are needs pollinator
+	--bit 10 is needs pollinator
 	--0 means needs pollinator
 	--1 means doesn't need
 	chr1 += 1 >> 7
 	chr2 += 1 >> 7
+	--bit 11 is vigorous (can grown over other plants and weeds)
+	--1 means vigorous
+	--bit 12 is weed defense
+	--0 means causes nearby weeds to die
+	chr1 += 1 >> 5
+	chr2 += 1 >> 5
 	
 	return flower_class:create(chr1, chr2)
 end
@@ -882,8 +920,8 @@ end
 -->8
 --flower breeding
 
-breed_rate = 20
---breed_rate = 100
+--breed_rate = 20
+breed_rate = 100
 
 function for_all_flowers(fn)
 	for x=1,f_max_x do
@@ -905,6 +943,12 @@ function time_passes()
 				flower:set_growth_state(growth_stage+1, 3)
 			else 
 				flower:set_growth_state(growth_stage, growth_time - 1)
+			end
+		else
+			if flower:has_weed_defense_gene() then
+				for coords, _ in pairs(generate_neighbors(flower.x, flower.y, 2)) do
+					field1:set_weeds(false, unpacks(coords))
+				end
 			end
 		end
 	end)
@@ -948,9 +992,14 @@ function breed_all_flowers()
 			local nx, ny = unpacks(coords)
 			local neighbor = field1:get(nx, ny)
 			if neighbor and neighbor:is_adult() and flower:is_compatible(neighbor) then
-				local child_spaces = intersection(
-					all_neighbors,
-					generate_neighbors(nx, ny))
+				local child_spaces = {}
+				for coords in all(intersection(
+						all_neighbors,
+						generate_neighbors(nx, ny))) do
+					if can_flower_spread_to_coords(flower, coords) then
+						add(child_spaces, coords)
+					end
+				end
 				if #child_spaces > 0 then
 					local cx,cy = unpacks(rnd(child_spaces))
 					add(eligible_neighbors, {neighbor, cx, cy})
@@ -966,13 +1015,12 @@ function breed_all_flowers()
 		else
 			local clone_spaces = {}
 			for coords,_ in pairs(all_neighbors) do
-				local cx,cy = unpacks(coords)
-				if not field1:get(cx,cy) then
-					add(clone_spaces, {cx, cy})
+				if can_flower_spread_to_coords(flower, coords) then
+					add(clone_spaces, coords)
 				end
 			end
 			if #clone_spaces > 0 then
-				local cx, cy = unpack(rnd(clone_spaces))
+				local cx, cy = unpacks(rnd(clone_spaces))
 				local child = flower_class:create(flower.chr1, flower.chr2)
 				add_flower_to_field(child, cx, cy)
 			end
@@ -983,8 +1031,7 @@ end
 function intersection(coords1, coords2)
 	local ins = {}
 	for coords,_ in pairs(coords1) do
-		local x,y = unpacks(coords)
-		if coords2[coords] and not field1:get(x,y) then
+		if coords2[coords] then
 			add(ins, coords)
 		end
 	end
@@ -1005,6 +1052,14 @@ function generate_neighbors(x,y,radius)
 		end
 	end
 	return coords
+end
+
+function can_flower_spread_to_coords(flower, coords)
+	local cx,cy = unpacks(coords)
+	local cf = field1:get(cx,cy)
+	return 
+		(flower:has_vigorous_gene() and not (cf and cf:has_vigorous_gene())) or
+			not (cf or field1:has_weeds(cx,cy))
 end
 
 -->8
@@ -1209,14 +1264,14 @@ end
 
 
 __gfx__
-00000000000000004444f44477700000000000034466444400000000000000000044440004440066009999000000000000000000000000000000000000000000
-777777777777777744444444700000000033003046644444000000000000000004ffff4000400604097757900555555000000000000000000000000000000000
-000000000000000044f44444700000000300000009094444000000000000000004f55f4000406004977757790000000000000000000000000000000000000000
-000000000000700044f44444000000000000030099090444000000000000000004ffff4000400004977757790555555000000000000000000000000000000000
-0000000000007000444444f4000000000000003040444444000000000000000004ff8f4000400004975557790000000000000000000000000000000000000000
-7770077070700770444444f4000000000300000044444444000000000000000004f83f4066666004977777790555555000000000000000000000000000000000
-707070007070070744444444000000003000300044444444000000000000000004f33f4066666004097777900000000000000000000000000000000000000000
-77007770707007074444f44400000000000300004444444400000000000000000544445006660004009999000000000000000000000000000000000000000000
+00000000000000004444f44477700000033000004466444400000000000000000044440004440066009999000000000000000000000000000000000000000000
+777777777777777744444444700000000000003346644444000000000000000004ffff4000400604097757900555555000000000000000000000000000000000
+000000000000000044f44444700000000000030009094444000000000000000004f55f4000406004977757790000000000000000000000000000000000000000
+000000000000700044f44444000000003300000099090444000000000000000004ffff4000400004977757790555555000000000000000000000000000000000
+0000000000007000444444f4000000000030000040444444000000000000000004ff8f4000400004975557790000000000000000000000000000000000000000
+7770077070700770444444f4000000000000033044444444000000000000000004f83f4066666004977777790555555000000000000000000000000000000000
+707070007070070744444444000000003300300044444444000000000000000004f33f4066666004097777900000000000000000000000000000000000000000
+77007770707007074444f44400000000000000034444444400000000000000000544445006660004009999000000000000000000000000000000000000000000
 70700070777007070000000044444444444444444444444400000000000000000080020000cccc00999999990000000000000000000000000000000000000000
 7070770007000777000000004444444444444444444b34440000000000000000008822000cccccc0099999900000000000000000000000000000000000000000
 000000000000000000000000444444444444444444b334440000000000000000088882200cc99cc0009999000000000000000000000000000000000000000000
