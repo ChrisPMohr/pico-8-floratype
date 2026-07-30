@@ -219,7 +219,7 @@ function update_field_screen()
 -- this locks the animiation speed to a cycle of 128 frames
 --	if atn % 8 == 0 then
 --		for_all_flowers(function(flower,x,y)
---			if flower:dark_gene() == 1 and (y*4 + x%4) % 8 == (atn / 8) % 8 then
+--			if flower:pollinator_attract_level() > 0 and (y*4 + x%4) % 8 == (atn / 8) % 8 then
 --				create_and_place_flower_sprite(flower)
 --			end
 --		end)
@@ -596,8 +596,13 @@ flower_colors = {
 	{2,13}
 }
 
+--right shift index where
+--genes vs other state starts
 gene_start = 11
-chr_sizes = {1,1}
+--number of bits per chromosome
+--starting with the least
+--significant bit
+chr_sizes = {1,1,2,1}
 
 flower_class = {}
 flower_class.__index = flower_class
@@ -656,23 +661,30 @@ function flower_class:set_growth_state(stage, t)
 		t, 16, 3)
 end
 
-function flower_class:color_gene()
+function is_recessive(a1, a2)
+	return a1*a2 == 1
+end
+
+function combine_gene_level(a1, a2)
+	return a1+a2
+end
+
+function flower_class:color_gene_level()
 	-- color gene expression
 	-- 0 0 -> red
 	-- 0 1 -> blue
+	-- 1 0 -> blue
 	-- 1 1 -> yellow
-	local a1, a2 = self:get_alleles(0,1)
-	return a1 + a2
+	return combine_gene_level(self:get_alleles(0,1))
 end
 
-function flower_class:dark_gene()
+function flower_class:has_dark_gene()
 	-- dark gene expression
 	-- dark (1) is recessive
 	-- 0 0 -> light
 	-- 0 1 -> light
 	-- 1 1 -> dark
-	local a1, a2 = self:get_alleles(1,1)
-	return a1 * a2
+	return is_recessive(self:get_alleles(1,1))
 end
 
 function flower_class:color()
@@ -680,16 +692,44 @@ function flower_class:color()
 	--it's always purple. otherwise
 	--it's the color dictated by the
 	--color gene
-	if self:dark_gene() == 1 then
+	if self:has_dark_gene() then
 		return 3
 	else
-		return self:color_gene()
+		return self:color_gene_level()
 	end
+end
+
+function flower_class:pollinator_attract_level()
+	if not self:is_adult() then
+		return 0
+	end
+	return max(self:get_alleles(2,2))
+end
+
+function flower_class:needs_pollinator_gene()
+	-- needs pollinator (0) is dominant
+	return not is_recessive(self:get_alleles(4,1))
 end
 
 function flower_class:is_compatible(flower)
 	return self:type() == flower:type()
 end
+
+function flower_class:can_breed()
+	if not self:needs_pollinator_gene() then
+		return true
+	end
+	--right now cannot attract pollinators that you need to yourself
+	--because generate_neighbors excludes self
+	for coords, d in pairs(generate_neighbors(self.x, self.y, 2)) do
+		local neighbor = field1:get(unpacks(coords))
+		if neighbor and neighbor:pollinator_attract_level() >= d then
+			return true
+		end
+	end
+end
+
+--end flower class definition
 
 function generate_flower(flower_type)
 	--right now, this uses a
@@ -708,6 +748,15 @@ function generate_flower(flower_type)
 	--bits 6-7 are the colors
 	chr1 += flr(rnd(4)) >> 11
 	chr2 += flr(rnd(4)) >> 11
+	--bits 8-9 are pollinator attract level
+	--value is pollinator level (0-2)
+--	chr1 += 1 >> 9
+--	chr2 += 1 >> 9
+	--bit 10 are needs pollinator
+	--0 means needs pollinator
+	--1 means doesn't need
+	chr1 += 1 >> 7
+	chr2 += 1 >> 7
 	
 	return flower_class:create(chr1, chr2)
 end
@@ -791,7 +840,7 @@ function create_flower_sprite(flower)
 --animated
 --	local dy = atn \ 64
 	local dy = 0
-	if flower:dark_gene() == 1 and flower:is_adult() then
+	if flower:pollinator_attract_level() > 0 then
 		draw_to_swap_sprite(5,9,dy,4,4)
 	end
 end
@@ -878,7 +927,7 @@ function breed_all_flowers()
 	--breed
 	breeding = {}
 	for_all_flowers(function(flower)
-		if flower:is_adult() and rnd(100) < breed_rate then
+		if flower:is_adult() and flower:can_breed() and rnd(100) < breed_rate then
 			add(breeding, flower)
 		end
 	end)
@@ -942,14 +991,15 @@ function intersection(coords1, coords2)
 	return ins
 end
 
-function generate_neighbors(x,y)
+function generate_neighbors(x,y,radius)
 	local coords = {}
-	for dx=-1,1 do
-		for dy=-1,1 do
+	radius = radius or 1
+	for dx=-1*radius,radius do
+		for dy=-1*radius,radius do
 			if dx !=0 or dy != 0 then
 				local x2, y2 = x+dx, y+dy
 				if check_field_bounds(x2, y2) then
-					coords[x2..","..y2] = true
+					coords[x2..","..y2] = max(abs(dx),abs(dy))
 				end
 			end
 		end
