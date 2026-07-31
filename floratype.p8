@@ -93,6 +93,19 @@ function set_bits(bits, new_val, bit_shift, size)
 	return bits & mask | new_val >> bit_shift
 end
 
+function get_direction_input(x,y,x_max,y_max)
+	if btnp(⬆️) then
+		y -= 1
+	elseif btnp(⬇️) then
+		y += 1
+	elseif btnp(⬅️) then
+		x -= 1
+	elseif btnp(➡️) then
+		x += 1
+	end
+	return mid(1,x,x_max), mid(1,y,y_max)
+end
+
 
 
 -- copies a sprite from x0,y0
@@ -301,17 +314,7 @@ function move_field_cursor()
 		on_field = not on_field
 	end
 	if on_field then
-		if btnp(⬆️) then
-			fc_y -= 1
-		elseif btnp(⬇️) then
-			fc_y += 1
-		elseif btnp(⬅️) then
-			fc_x -= 1
-		elseif btnp(➡️) then
-			fc_x += 1
-		end
-		fc_y = mid(1,fc_y,f_max_y)
-		fc_x = mid(1,fc_x,f_max_x)
+		fc_x,fc_y = get_direction_input(fc_x,fc_y,f_max_x,f_max_y)
 		
 		if fc_y > fcam_y + 6 then
 			start_animation(move_camera_down)
@@ -326,13 +329,7 @@ function move_field_cursor()
 			start_animation(move_camera_left)
 		end
 	else
-		if btnp(⬅️) then
-			bc_x -= 1
-		end
-		if btnp(➡️) then
-			bc_x += 1
-		end
-		bc_x = mid(1,bc_x,4)
+		bc_x = get_direction_input(bc_x,0,4,0)
 	end
 end
 
@@ -1243,12 +1240,7 @@ function update_menu()
 	if btnp(❎) then
 		menu_is_open = false
 	end
-	if btnp(⬆️) then
-		mc_y -= 1
-	elseif btnp(⬇️) then
-		mc_y += 1
-	end
-	mc_y = mid(1,mc_y,#options)
+	_,mc_y = get_direction_input(0,mc_y,0,#options)
 end
 
 function draw_menu()
@@ -1348,19 +1340,9 @@ function update_genetics_screen()
 				g_current_value = pack(g_flower:get_alleles(gene_offset, gene_size))[gc_x]
 			end
 		end
-		if btnp(⬆️) then
-			gc_y -= 1
-		elseif btnp(⬇️) then
-			gc_y += 1
-		elseif btnp(⬅️) then
-			gc_x -= 1
-		elseif btnp(➡️) then
-			gc_x += 1
-		end
+		gc_x,gc_y = get_direction_input(gc_x,gc_y,2,gc_max_y)
+		gc_cy = min(gc_y,max(gc_cy,gc_y-7))
 	end
-	gc_y = mid(1,gc_y,gc_max_y)
-	gc_x = mid(1,gc_x,2)
-	gc_cy = min(gc_y,max(gc_cy,gc_y-7))
 end
 
 function draw_genetics_screen()
