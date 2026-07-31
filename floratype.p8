@@ -1,6 +1,8 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
+day = 1
+
 function _init()
 	--modes/screens of the game:
 	--1 field
@@ -47,13 +49,14 @@ function _draw()
 	end
 end
 
-save_magic_number = 0xabad.babe
+save_magic_number = 0xac01
 
 function save_game()
 	--sync field state to sprite memory
 	--save to cart
 	--reserve the first 4 bytes for future use
-	poke4(0x1000,save_magic_number)
+	poke2(0x1000,save_magic_number)
+	poke(0x1002,day)
 	local end_addr = field1:save(0x1004)
 	assert(end_addr < 0x2000,"tried to save too much memory "..end_addr)
 	
@@ -62,7 +65,8 @@ end
 
 function load_game()
 	reload(0x1000,0x1000,0x1000,"floratype_save.p8")
-	if $0x1000 == save_magic_number then
+	if %0x1000 == save_magic_number then
+		day = @0x1002
 		field1 = field_class:load(0x1004)
 		init_field_screen()
 		sync_flower_sprites()
@@ -272,6 +276,9 @@ function draw_field_screen()
 	end
 	clip()
 	camera()
+	draw_filled_rrect(
+		unpacks"96,2,31,9,0,0,15")
+	print("day "..day,98,4,0)
 	draw_toolbar()
 	if not menu_is_open and not on_field then
 		draw_button_cursor()
@@ -939,8 +946,8 @@ end
 -->8
 --flower breeding
 
---breed_rate = 20
-breed_rate = 100
+breed_rate = 20
+--breed_rate = 100
 
 function for_all_flowers(fn)
 	for x=1,f_max_x do
@@ -972,6 +979,7 @@ function time_passes()
 		end
 	end)
 	sync_flower_sprites()
+	day += 1
 end
 
 function breed_all_flowers()
