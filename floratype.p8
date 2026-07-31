@@ -3,7 +3,7 @@ version 43
 __lua__
 --player state
 day = 1
-inventory = {}
+harvested_flower_inventory = {}
 
 function _init()
 	--modes/screens of the game:
@@ -232,6 +232,17 @@ function check_field_bounds(x,y)
 	return x >=1 and x <= f_max_x and y >= 1 and y <= f_max_y
 end
 
+function for_all_flowers(fn)
+	for x=1,f_max_x do
+		for y=1,f_max_y do
+			local flower = field1:get(x,y)
+			if flower then
+				fn(flower,x,y)
+			end
+		end
+	end
+end
+
 function init_field_screen()
 	-- make sprite 0 opaque in the map
 	poke(0x5f36,0x08)
@@ -420,8 +431,13 @@ end
 function pick_flower_from_field()
 	local flower = field1:get(fc_x, fc_y)
 	if flower and flower:is_adult() then
-		add(inventory, flower)
-		field_debug = #inventory
+		local display_str = flower:display_str()
+		if not harvested_flower_inventory[display_str] then
+			harvested_flower_inventory[display_str] = {}
+		end
+		add(
+			harvested_flower_inventory[display_str],
+			harvested_flower_lifespan)
 		remove_flower_from_field()
 	end
 end
@@ -653,6 +669,10 @@ gene_start = 11
 --significant bit
 chr_sizes = {1,1,2,1,1,1}
 
+
+harvested_flower_lifespan = 4
+
+
 flower_class = {}
 flower_class.__index = flower_class
 
@@ -683,6 +703,16 @@ function flower_class:get_alleles(offset, size)
 		get_bits(self.chr1, bit_shift, size),
 		get_bits(self.chr2, bit_shift, size)
 end
+
+function flower_class:display_str(alive)
+	--consider refactoring with a join function
+	--to save tokens
+	local pollinator_attract_level = alive and self:pollinator_attract_level() or 0
+	return self:type()..","..
+		self:growth_state()..","..
+		self:color()..","..
+		pollinator_attract_level
+end 
 
 function flower_class:type()
 	return get_bits(self.chr1, 16, 2)
@@ -873,13 +903,12 @@ function draw_to_swap_sprite(s,x_off,y_off,w,h,f)
 	end
 end
 
-function create_flower_sprite(flower)
+function create_flower_sprite(flower_display_str)
 	--always must immediately copy this somewhere
 	--as it will be overwritten on next
 	--call to create_sprite
-	local template = 32 + flower:type() * 2
-	local growth_stage = flower:growth_state()
-	local c = flower:color()
+	local flower_type,growth_stage,flower_color,pollinator_attract_level = unpacks(flower_display_str)
+	local template = 32 + flower_type * 2
 
 	local w,h,offx,offy=unpacks"15,15,0,0"
 	if growth_stage == 0 then
@@ -898,7 +927,7 @@ function create_flower_sprite(flower)
 		template,offx,offy,w,h,
 		function(pc)
 			if pc <= 2 then
-				pc = flower_colors[c+1][pc]
+				pc = flower_colors[flower_color+1][pc]
 			end
 			return pc
 		end
@@ -908,7 +937,7 @@ function create_flower_sprite(flower)
 --animated
 --	local dy = atn \ 64
 	local dy = 0
-	if flower:pollinator_attract_level() > 0 then
+	if pollinator_attract_level > 0 then
 		draw_to_swap_sprite(5,9,dy,4,4)
 	end
 end
@@ -916,7 +945,7 @@ end
 function create_and_place_flower_sprite(flower, sx, sy)
 	local screen_x, screen_y = sx and sx or flower.x - fcam_x, sy and sy or flower.y - fcam_y
 	if sx or (screen_x >= 0 and screen_x <= 7 and screen_y >= 0 and screen_y <= 6) then
-		create_flower_sprite(flower)
+		create_flower_sprite(flower:display_str(true))
 		--copy sprite to correct location in
 		--extended sprite sheet 0
 		blit(
@@ -948,21 +977,11 @@ function remove_flower_sprite(x, y, sx, sy)
 	)
 end
 -->8
---flower breeding
+--day upkeep
 
 breed_rate = 20
 --breed_rate = 100
 
-function for_all_flowers(fn)
-	for x=1,f_max_x do
-		for y=1,f_max_y do
-			local flower = field1:get(x,y)
-			if flower then
-				fn(flower,x,y)
-			end
-		end
-	end
-end
 
 function time_passes()
 	breed_all_flowers()
@@ -983,6 +1002,16 @@ function time_passes()
 		end
 	end)
 	sync_flower_sprites()
+
+	--tick down lifespans of harvested flowers
+	for _,lifespans in pairs(harvested_flower_inventory) do
+		for i=1,#lifespans do
+			lifespans[i] -= 1
+		end
+		for i=1,count(lifespans,0) do
+			del(lifespans,0)
+		end
+	end
 	day += 1
 end
 
@@ -1221,7 +1250,7 @@ function open_tools_menu(on_close)
 	menu_title = "tools"
 	options = {
 		split"40,destroy,1",
-		split"41,pick,2",
+		split"41,harvest,2",
 		split"42,genetics,3",
 	}
 	menu_min_x,menu_min_y = 31,53
