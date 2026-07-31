@@ -1011,45 +1011,45 @@ function breed_all_flowers()
 	end
 	
 	for flower in all(breeding) do
-		--determine eligible neighbors
+		--create a random possible child for each neighbor
+		--this flower can breed with
 		local all_neighbors = generate_neighbors(flower.x, flower.y)
-		local eligible_neighbors={}
+		local possible_children={}
 
 		for coords,_ in pairs(all_neighbors) do
 			local nx, ny = unpacks(coords)
 			local neighbor = field1:get(nx, ny)
 			if neighbor and neighbor:is_adult() and flower:is_compatible(neighbor) then
+				-- generate the child so we can use its properties
+				local child = breed(flower, neighbor)
 				local child_spaces = {}
 				for coords in all(intersection(
 						all_neighbors,
 						generate_neighbors(nx, ny))) do
-					if can_flower_spread_to_coords(flower, coords) then
-						add(child_spaces, coords)
+					if can_flower_spread_to_coords(child, coords) then
+						add(child_spaces, {child, coords})
 					end
 				end
 				if #child_spaces > 0 then
-					local cx,cy = unpacks(rnd(child_spaces))
-					add(eligible_neighbors, {neighbor, cx, cy})
+					add(possible_children, rnd(child_spaces))
 				end
 			end
 		end
 		
 		--create a new flower
-		if #eligible_neighbors > 0 then
-			local neighbor,cx,cy = unpack(rnd(eligible_neighbors))
-			local child = breed(flower, neighbor)
-			add_flower_to_field(child, cx, cy)
+		if #possible_children > 0 then
+			local child, coords = unpack(rnd(possible_children))
+			add_flower_to_field(child, unpacks(coords))
 		else
+			local clone = flower_class:create(flower.chr1, flower.chr2)
 			local clone_spaces = {}
 			for coords,_ in pairs(all_neighbors) do
-				if can_flower_spread_to_coords(flower, coords) then
+				if can_flower_spread_to_coords(clone, coords) then
 					add(clone_spaces, coords)
 				end
 			end
 			if #clone_spaces > 0 then
-				local cx, cy = unpacks(rnd(clone_spaces))
-				local child = flower_class:create(flower.chr1, flower.chr2)
-				add_flower_to_field(child, cx, cy)
+				add_flower_to_field(clone, unpacks(rnd(clone_spaces)))
 			end
 		end
 	end
