@@ -10,9 +10,13 @@ function _init()
 	cls()
 	init_field_screen()
 	init_calendar_screen()
+	init_genetics_screen()
 	
 	start_field_screen()
 --	start_calendar_screen()
+--	local flower = generate_flower(0)
+--	add_flower_to_field(flower, 1, 1)
+--	start_genetics_screen(flower)
 end
 
 function _update()
@@ -24,6 +28,8 @@ function _update()
 			update_field_screen()
 		elseif mode == 2 then
 			update_calendar_screen()
+		elseif mode == 3 then
+			update_genetics_screen()
 		end
 	end
 end
@@ -33,6 +39,8 @@ function _draw()
 		draw_field_screen()
 	elseif mode == 2 then
 		draw_calendar_screen()
+	elseif mode == 3 then
+		draw_genetics_screen()
 	end
 	if menu_is_open then
 		draw_menu()
@@ -68,16 +76,16 @@ function unpacks(s)
 	return unpack(split(s))
 end
 
-function bit_mask(size)
-	return (2 << (size - 1)) - 1
+function max_binary(size)
+	return 2 ^ size - 1
 end
 
 function get_bits(bits, bit_shift, size)
-	return (bits << bit_shift) & bit_mask(size)
+	return (bits << bit_shift) & max_binary(size)
 end
 
 function set_bits(bits, new_val, bit_shift, size)
-	local mask = 0xffff.ffff ^^ bit_mask(size) >> bit_shift
+	local mask = 0xffff.ffff ^^ max_binary(size) >> bit_shift
 	return bits & mask | new_val >> bit_shift
 end
 
@@ -221,13 +229,17 @@ function init_field_screen()
 	selected_tool, selected_seed = 0, 0
 end
 
-function start_field_screen()
+function resume_field_screen()
 	mode = 1
 	on_field = true
-	fc_x, fc_y = fcam_x+3, fcam_y+3
 	animation = nil
 	a_frame = 0
 	anim_dx, anim_dy = 0 ,0
+end
+
+function start_field_screen()
+	resume_field_screen()
+	fc_x, fc_y = fcam_x+3, fcam_y+3
 end
 
 function update_field_screen()
@@ -338,6 +350,11 @@ function click_button()
 				end
 			elseif selected_tool == 1 then
 				remove_flower_from_field()
+			elseif selected_tool == 2 then
+				local flower = field1:get(fc_x, fc_y)
+				if flower then
+					start_genetics_screen(flower)
+				end
 			end
 		else
 			if bc_x == 1 then
@@ -468,6 +485,8 @@ function draw_toolbar()
 		s = 24 + selected_seed
 	elseif selected_tool == 1 then
 		s = 40
+	elseif selected_tool == 2 then
+		s = 41
 	end
 	if s then
 		spr(s,3,116)
@@ -621,7 +640,7 @@ gene_start = 11
 --number of bits per chromosome
 --starting with the least
 --significant bit
-chr_sizes = {1,1,2,1}
+chr_sizes = {1,1,2,1,1,1}
 
 flower_class = {}
 flower_class.__index = flower_class
@@ -1190,9 +1209,10 @@ function open_tools_menu(on_close)
 	menu_title = "tools"
 	options = {
 		split"40,destroy,1",
+		split"41,genetics,2",
 	}
-	menu_min_x,menu_min_y = 31,75
-	menu_w,menu_h = 55,35
+	menu_min_x,menu_min_y = 31,67
+	menu_w,menu_h = 55,41
 end
 
 function open_options_menu(on_close)
@@ -1263,6 +1283,119 @@ end
 
 
 
+-->8
+--genetics screen
+--first draft just show a vertical list
+--with name + both values
+
+function init_genetics_screen()
+	gene_info = {
+		"0,1,color",
+		"1,1,darkness",
+		"2,2,attractiv",
+		"4,1,rq polntr",
+		"5,1,vigorous",
+		"6,1,weed def",
+		"0,0,save"
+	}
+	gc_max_y = #gene_info
+end
+
+function start_genetics_screen(flower)
+	mode = 3
+	g_flower = flower
+	gc_y,gc_x,g_current_value = 1,1
+	gc_cy = 1
+end
+
+function update_genetics_screen()
+	local gene_offset, gene_size, gene_name = unpacks(gene_info[gc_y])
+	if g_current_value then
+		if btnp(⬆️) then
+			g_current_value += 1
+			atn = 0
+		elseif btnp(⬇️) then
+			g_current_value -= 1
+			atn = 0
+		end
+		g_current_value = mid(0,g_current_value,max_binary(gene_size))
+
+		if btnp(❎) then
+			g_current_value = nil
+		elseif btnp(🅾️) then
+			local bit_shift = gene_start - gene_offset
+			if gc_x == 1 then
+				g_flower.chr1 = set_bits(g_flower.chr1, g_current_value, bit_shift, gene_size)
+			else
+				g_flower.chr2 = set_bits(g_flower.chr2, g_current_value, bit_shift, gene_size)
+			end
+			g_current_value = nil
+		end
+	else
+		if btnp(🅾️) then
+			if gc_y == gc_max_y then
+				sync_flower_sprite(g_flower.x,g_flower.y)
+				resume_field_screen()
+			else
+				g_current_value = pack(g_flower:get_alleles(gene_offset, gene_size))[gc_x]
+			end
+		end
+		if btnp(⬆️) then
+			gc_y -= 1
+		elseif btnp(⬇️) then
+			gc_y += 1
+		elseif btnp(⬅️) then
+			gc_x -= 1
+		elseif btnp(➡️) then
+			gc_x += 1
+		end
+	end
+	gc_y = mid(1,gc_y,gc_max_y)
+	gc_x = mid(1,gc_x,2)
+	gc_cy = min(gc_y,max(gc_cy,gc_y-7))
+end
+
+function draw_genetics_screen()
+	--draw frame
+	draw_filled_rrect(unpacks"0,0,128,128,0,5,6")
+	-- camera + clip
+	camera(0,gc_cy*15-15)
+	draw_genetics_screen_info()
+	draw_genetics_screen_cursor()
+	camera()
+end
+
+function draw_genetics_screen_info()
+	local y
+	for i=1,gc_max_y do
+		y = -5 + i*15
+		local gene_offset, gene_size, gene_name = unpacks(gene_info[i])
+		local chr1, chr2 = g_flower:get_alleles(gene_offset, gene_size)
+		print(gene_name, 10, y, 0)
+		if i < gc_max_y then
+			print(genetics_screen_disp_value(chr1,1,i),60,y)
+			print(genetics_screen_disp_value(chr2,2,i),74,y)
+		end
+	end
+end
+
+function genetics_screen_disp_value(v,x,y)
+	if not g_current_value or x != gc_x or y != gc_y then
+		return v
+	else
+		return atn % 32 < 20 and g_current_value or ""
+	end
+end
+
+function draw_genetics_screen_cursor()
+	if gc_y == gc_max_y then
+		rect(8,-7+gc_y*15,26,1+gc_y*15,0)
+	else
+		print("⬆️",44+gc_x*14,-11+gc_y*15)
+		print("⬇️",44+gc_x*14,1+gc_y*15)
+	end
+end
+
 __gfx__
 00000000000000004444f44477700000033000004466444400000000000000000044440004440066009999000000000000000000000000000000000000000000
 777777777777777744444444700000000000003346644444000000000000000004ffff4000400604097757900555555000000000000000000000000000000000
@@ -1280,14 +1413,14 @@ __gfx__
 777777777777777700000000444b344444444333b444444400000000000000000088880000cccc00000990000000000000000000000000000000000000000000
 00000000000000000000000044433444444444433444444400000000000000000003300000033000000330000000000000000000000000000000000000000000
 00000000000000000000000044533544444444533544444400000000000000000003300000033000000330000000000000000000000000000000000000000000
-44444444444444444444444444444444444444444122444400000000000000000000066000000000000000000000000000000000000000000000000000000000
-44444141141444444444444114444444444444441211244400000000000000000000466600000000000000000000000000000000000000000000000000000000
-44444121121444444444112112114444444444441211124400000000000000000000406600000000000000000000000000000000000000000000000000000000
-44441112121144444444112112114444444444411121124400000000000000000004000600000000000000000000000000000000000000000000000000000000
-44441111211144444444221771224444444444411122244400000000000000000040000600000000000000000000000000000000000000000000000000000000
-44441111121144444441117777111444444444411124444400000000000000000400006000000000000000000000000000000000000000000000000000000000
-44441111112144444441117777111444444444411244444400000000000000000400000000000000000000000000000000000000000000000000000000000000
-44444111111444444444221771224444444444411444444400000000000000004000000000000000000000000000000000000000000000000000000000000000
+44444444444444444444444444444444444444444122444400000000000000000000066000199c00000000000000000000000000000000000000000000000000
+4444414114144444444444411444444444444444121124440000000000000000000046660001c000000000000000000000000000000000000000000000000000
+444441211214444444441121121144444444444412111244000000000000000000004066000c1000000000000000000000000000000000000000000000000000
+44441112121144444444112112114444444444411121124400000000000000000004000600188c00000000000000000000000000000000000000000000000000
+44441111211144444444221771224444444444411122244400000000000000000040000600199c00000000000000000000000000000000000000000000000000
+4444111112114444444111777711144444444441112444440000000000000000040000600001c000000000000000000000000000000000000000000000000000
+444411111121444444411177771114444444444112444444000000000000000004000000000c1000000000000000000000000000000000000000000000000000
+44444111111444444444221771224444444444411444444400000000000000004000000000188c00000000000000000000000000000000000000000000000000
 4444441111444444444411211211444444444443344b34440000000000000000eeeeeeeed6656d00ffff00000000000000000000000000000000000000000000
 44444443344b344444441121121144444444444334b334440000000000000000eeeeeeeed6656dd0ffffffff0000000000000000000000000000000000000000
 4444444334b33444444444411444444444443b433b334444000000000000000067777776d6666dddf777777f0000000000000000000000000000000000000000
