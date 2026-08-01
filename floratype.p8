@@ -6,9 +6,22 @@ __lua__
 day = 1
 
 function _init()
-	--modes/screens of the game:
-	--1 field
-	--2 calendar
+	updates = {
+		update_field_screen,
+		update_calendar_screen,
+		update_genetics_screen,
+		update_inventory_screen,
+		update_order_screen
+	}
+	draws = {
+		draw_field_screen,
+		draw_calendar_screen,
+		draw_genetics_screen,
+		draw_inventory_screen,
+		draw_order_screen
+	}
+	
+	
 	atn, atx = 0, 128
 	memset(0x8000, 0x44, 0x4000)
 	cls()
@@ -36,33 +49,15 @@ function _update()
 	if menu_is_open then
 		update_menu()
 	else
-		if mode == 1 then
-			update_field_screen()
-		elseif mode == 2 then
-			update_calendar_screen()
-		elseif mode == 3 then
-			update_genetics_screen()
-		elseif mode == 4 then
-			update_inventory_screen()
-		elseif mode == 5 then
-			update_order_screen()
-		end
+		updates[mode]()
 	end
 end
 
+	
 function _draw()
-	if mode == 1 then
-		draw_field_screen()
 	elseif mode == 2 then
-		draw_calendar_screen()
-	elseif mode == 3 then
-		draw_genetics_screen()
-	elseif mode == 4 then
-		draw_inventory_screen()
-	elseif mode == 5 then
-		draw_order_screen()
-	end
-	if menu_is_open then
+	draws[mode]()
+	if menu_is_open then	
 		draw_menu()
 	end
 end

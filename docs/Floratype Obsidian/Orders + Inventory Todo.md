@@ -1,6 +1,6 @@
 - [ ] Can't overfill orders
 - [ ] Orders reward money
-- [ ] Save/load inventory + orders
+- [ ] Save/load inventory + orders + money
 - [ ] Notifications/toasts (flowers expired)
 - [ ] Multiple Orders exists + are visible at a time
 - [ ] Orders with a due date
