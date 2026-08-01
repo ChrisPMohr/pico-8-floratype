@@ -33,8 +33,8 @@ function _init()
 
 	start_field_screen()
 --	start_calendar_screen()
---	for i=1,30 do
---		local flower = generate_flower(0)
+--	for i=1,100 do
+--		local flower = generate_flower(flr(rnd(3)))
 --		flower:set_growth_state(2,0)
 --		add_flower_to_field(flower, fc_x, fc_y)
 --		pick_flower_from_field()
@@ -941,9 +941,7 @@ function create_flower_sprite(flower_display_str)
 	end
 	
 	--erase sprite swap space
-	poke(0x5f55,0x00)
-	rectfill(unpacks"0,0,15,15,4")
-	poke(0x5f55,0x60)
+	blit(unpacks"0x0000,0,0,0xa000,0,0,16,16")
 	
 	--draw template to the sprite sheet
 	draw_to_swap_sprite(
@@ -1423,7 +1421,7 @@ function update_genetics_screen()
 			end
 		end
 		gc_x,gc_y = get_direction_input(gc_x,gc_y,2,gc_max_y)
-		gc_cy = min(gc_y,max(gc_cy,gc_y-7))
+		gc_cy = mid(gc_y-7,gc_cy,gc_y)
 	end
 end
 
@@ -1489,7 +1487,14 @@ function start_inventory_screen(resume, select_mode, limit, selector)
 		add(i_inventory, 0)
 	end
 	ic_max_y = #i_inventory
-	ic_y, i_total_selected = 1, 0
+	--this is correct bounds for movement,
+	--but need to be careful not to use
+	--this as the length of i_inventory if
+	--not in select_mode
+	if not select_mode then
+		ic_max_y -= 5
+	end
+	ic_y, ic_cy, i_total_selected = 1, 1, 0
 	i_resume, i_select_mode, i_limit = resume, select_mode, limit
 end
 
@@ -1523,19 +1528,25 @@ function update_inventory_screen()
 		end
 	end
 	_,ic_y = get_direction_input(0,ic_y,0,ic_max_y)
+	ic_cy = i_select_mode and mid(ic_y-5,ic_cy,ic_y) or ic_y
 end
 
 function draw_inventory_screen()
 	--draw frame
 	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
+	print(i_select_mode and "select flowers" or "harvested flowers",10,4,0)
+	camera(0,ic_cy*18-16)
+	clip(unpacks"0,10,128,107")
 	draw_inventory_screen_info()
 	draw_inventory_screen_cursor()
+	camera()
+	clip()
+	print(i_select_mode and "❎ cancel" or "❎ close",90,118)
 end
 
 function draw_inventory_screen_info()
 	palt(0b0000100000000000)
-	print("harvested flowers",10,4,0)
-	for i = 1,ic_max_y do
+	for i = 1,#i_inventory do
 		local y = -1 + i*18
 		if i_select_mode and i == ic_max_y then
 			print("submit",60,y)

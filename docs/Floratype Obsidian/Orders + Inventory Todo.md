@@ -5,5 +5,5 @@
 - [x] Notifications/toasts (flowers expired, money earned)
 - [x] Orders with a due date
 - [ ] Orders appear in advance on calendar
-- [ ] Scrolling on inventory screen
+- [x] Scrolling on inventory screen
 - [ ] Calculate variable order price
