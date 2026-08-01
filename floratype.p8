@@ -55,7 +55,6 @@ end
 
 	
 function _draw()
-	elseif mode == 2 then
 	draws[mode]()
 	if menu_is_open then	
 		draw_menu()
@@ -1460,12 +1459,11 @@ function init_inventory_screen()
 	harvested_flower_inventory = {}
 end
 
-function start_inventory_screen(resume, select_mode, selector)
+function start_inventory_screen(resume, select_mode, limit, selector)
 	mode = 4
-	ic_y = 1
 	i_inventory = {}
 	for display_str,lifespans in pairs(harvested_flower_inventory) do
-		if not select_mode or selector(display_str) then
+		if not selector or selector(display_str) then
 			add(i_inventory, {display_str,0,lifespans})
 		end
 	end
@@ -1473,7 +1471,8 @@ function start_inventory_screen(resume, select_mode, selector)
 		add(i_inventory, 0)
 	end
 	ic_max_y = #i_inventory
-	i_resume, i_select_mode = resume, select_mode
+	ic_y, i_total_selected = 1, 0
+	i_resume, i_select_mode, i_limit = resume, select_mode, limit
 end
 
 function update_inventory_screen()
@@ -1483,26 +1482,26 @@ function update_inventory_screen()
 	if i_select_mode then
 		if ic_y == ic_max_y then
 			if btnp(🅾️) then
-				local total_selected = 0
 				for i = 1,ic_max_y - 1 do
 					local display_str,selected,lifespans = unpack(i_inventory[i])
-					total_selected += selected
 					if selected == #lifespans then
 						harvested_flower_inventory[display_str] = nil
 					else
 						remove_oldest_n(lifespans, selected)
 					end
 				end
-				i_resume(total_selected)
+				i_resume(i_total_selected)
 			end
 		else
-			local _,selected,lifespans = unpack(i_inventory[ic_y])
-			if btnp(⬅️) then
-				selected -= 1
-			elseif btnp(➡️) then
-				selected += 1
+			local inventory_row = i_inventory[ic_y]
+			local _,selected,lifespans = unpack(inventory_row)
+			if btnp(⬅️) and selected > 0 then
+				inventory_row[2] -= 1
+				i_total_selected -= 1
+			elseif btnp(➡️) and selected < #lifespans and (not limit or i_total_selected < limit) then
+				inventory_row[2] += 1
+				i_total_selected += 1
 			end
-			i_inventory[ic_y][2] = mid(0,selected,#lifespans)
 		end
 	end
 	_,ic_y = get_direction_input(0,ic_y,0,ic_max_y)
@@ -1593,12 +1592,15 @@ function update_order_screen()
 			-- go to wherever we were before
 			o_resume()
 		else
+			local order_row = order[oc_y]
 			start_inventory_screen(function(selected_flowers)
-				order[oc_y][3] += selected_flowers
-				resume_order_screen()
-			end,
-			true,
-			make_selector_function(order[oc_y][2]))
+					order_row[3] += selected_flowers
+					resume_order_screen()
+				end,
+				true,
+				order_row[4] - order_row[3],
+				make_selector_function(order_row[2])
+			)
 		end
 	end
 	_,oc_y = get_direction_input(0,oc_y,0,oc_max_y)

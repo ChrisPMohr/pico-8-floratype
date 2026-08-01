@@ -1,4 +1,4 @@
-- [ ] Can't overfill orders
+- [x] Can't overfill orders
 - [ ] Orders reward money
 - [ ] Save/load inventory + orders + money
 - [ ] Notifications/toasts (flowers expired)
