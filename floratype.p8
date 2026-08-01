@@ -1,9 +1,9 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
---player state
+--main
+
 day = 1
-harvested_flower_inventory = {}
 
 function _init()
 	--modes/screens of the game:
@@ -15,6 +15,7 @@ function _init()
 	init_field_screen()
 	init_calendar_screen()
 	init_genetics_screen()
+	init_inventory_screen()
 	
 	start_field_screen()
 --	start_calendar_screen()
@@ -34,6 +35,8 @@ function _update()
 			update_calendar_screen()
 		elseif mode == 3 then
 			update_genetics_screen()
+		elseif mode == 4 then
+			update_inventory_screen()
 		end
 	end
 end
@@ -45,6 +48,8 @@ function _draw()
 		draw_calendar_screen()
 	elseif mode == 3 then
 		draw_genetics_screen()
+	elseif mode == 4 then
+		draw_inventory_screen()
 	end
 	if menu_is_open then
 		draw_menu()
@@ -80,6 +85,15 @@ end
 
 function unpacks(s)
 	return unpack(split(s))
+end
+
+function count_table(t)
+	local c = 0
+	for _ in pairs(t) do
+		c += 1
+	end
+	field_debug = c
+	return c
 end
 
 function max_binary(size)
@@ -256,7 +270,7 @@ function init_field_screen()
 	if field1 == nil then
 		field1 = field_class:new(1)
 	end
-	selected_tool, selected_seed, selected_tool_spr = 0, 0
+	selected_tool, selected_seed, selected_tool_spr = 0, 0, 24
 end
 
 function resume_field_screen()
@@ -400,8 +414,10 @@ function click_button()
 						if i == 1 then
 							start_calendar_screen()
 						elseif i == 2 then
-							save_game()
+							start_inventory_screen()
 						elseif i == 3 then
+							save_game()
+						elseif i == 4 then
 							load_game()
 						end
 					end)
@@ -1004,12 +1020,15 @@ function time_passes()
 	sync_flower_sprites()
 
 	--tick down lifespans of harvested flowers
-	for _,lifespans in pairs(harvested_flower_inventory) do
+	for display_str,lifespans in pairs(harvested_flower_inventory) do
 		for i=1,#lifespans do
 			lifespans[i] -= 1
 		end
 		for i=1,count(lifespans,0) do
 			del(lifespans,0)
+		end
+		if #lifespans == 0 then
+			harvested_flower_inventory[display_str] = nil
 		end
 	end
 	day += 1
@@ -1262,11 +1281,12 @@ function open_options_menu(on_close)
 	menu_title = "options"
 	options = {
 		split"56,calendar,1",
-		split"57,save,2",
-		split"58,load,3",
+		split"57,flowers,2",
+		split"58,save,3",
+		split"59,load,4",
 	}
-	menu_min_x,menu_min_y = 63,55
-	menu_w,menu_h = 55,55
+	menu_min_x,menu_min_y = 63,41
+	menu_w,menu_h = 55,69
 end
 
 function update_menu()
@@ -1323,7 +1343,7 @@ end
 -->8
 --genetics screen
 --first draft just show a vertical list
---with name + both values
+--with name + both allele values
 
 function init_genetics_screen()
 	gene_info = {
@@ -1423,6 +1443,50 @@ function draw_genetics_screen_cursor()
 	end
 end
 
+-->8
+--flower inventory screen
+
+--todo: save/load inventory
+
+harvested_flower_inventory = {}
+
+function init_inventory_screen()
+
+end
+
+function start_inventory_screen(flower)
+	mode = 4
+	ic_x,ic_y = 1,1
+	ic_max_y = count_table(harvested_flower_inventory)
+end
+
+function update_inventory_screen()
+	if btnp(❎) then
+		resume_field_screen()
+	end
+	ic_x,ic_y = get_direction_input(ic_x,ic_y,1,ic_max_y)
+end
+
+function draw_inventory_screen()
+	--draw frame
+	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
+	draw_inventory_screen_info()
+end
+
+function draw_inventory_screen_info()
+	local i = 0
+	print("harvested flowers",10,4,0)
+	palt(0b0000100000000000)
+	for display_str,lifespans in pairs(harvested_flower_inventory) do
+		i += 1
+		local y = -5 + i*18
+		create_flower_sprite(display_str)
+		spr(0, 10, y, 2, 2)
+		print("x"..#lifespans,30, y+4,0)
+	end
+	palt()
+end
+
 __gfx__
 00000000000000004444f44477700000033000004466444400000000000000000044440004440066009999000000000000000000000000000000000000000000
 777777777777777744444444700000000000003346644444000000000000000004ffff4000400604097757900555555000000000000000000000000000000000
@@ -1448,14 +1512,14 @@ __gfx__
 4444111112114444444111777711144444444441112444440000000000000000040000600ffffff00001c0000000000000000000000000000000000000000000
 44441111112144444441117777111444444444411244444400000000000000000400000000fffff0000c10000000000000000000000000000000000000000000
 444441111114444444442217712244444444444114444444000000000000000040000000000fff0000188c000000000000000000000000000000000000000000
-4444441111444444444411211211444444444443344b34440000000000000000eeeeeeeed6656d00ffff00000000000000000000000000000000000000000000
-44444443344b344444441121121144444444444334b334440000000000000000eeeeeeeed6656dd0ffffffff0000000000000000000000000000000000000000
-4444444334b33444444444411444444444443b433b334444000000000000000067777776d6666dddf777777f0000000000000000000000000000000000000000
-44443b433b3344444444444334b34444444433b333344444000000000000000067755776ddddddddf755557f0000000000000000000000000000000000000000
-444433b33334444444443b433b3344444444433334444444000000000000000067775776d666666df777777f0000000000000000000000000000000000000000
-4444433334444444444433b3333444444444444334444444000000000000000067755576d655556df755557f0000000000000000000000000000000000000000
-444444433444444444444333344444444444444334444444000000000000000066777776d666666df777777f0000000000000000000000000000000000000000
-444444533544444444444453354444444444445335444444000000000000000056666666d666666dffffffff0000000000000000000000000000000000000000
+4444441111444444444411211211444444444443344b34440000000000000000eeeeeeee80020cccd6656d00ffff000000000000000000000000000000000000
+44444443344b344444441121121144444444444334b334440000000000000000eeeeeeee88220c9cd6656dd0ffffffff00000000000000000000000000000000
+4444444334b33444444444411444444444443b433b33444400000000000000006777777688820cccd6666dddf777777f00000000000000000000000000000000
+44443b433b3344444444444334b34444444433b33334444400000000000000006775577608800b00ddddddddf755557f00000000000000000000000000000000
+444433b33334444444443b433b33444444444333344444440000000000000000677757760030b000d666666df777777f00000000000000000000000000000000
+4444433334444444444433b33334444444444443344444440000000000000000677555760003b000d655556df755557f00000000000000000000000000000000
+444444433444444444444333344444444444444334444444000000000000000066777776000b3000d666666df777777f00000000000000000000000000000000
+444444533544444444444453354444444444445335444444000000000000000056666666000b0300d666666dffffffff00000000000000000000000000000000
 __label__
 7774f4444444f7774444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f444
 74444444444444474444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444
