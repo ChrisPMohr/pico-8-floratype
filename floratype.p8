@@ -4,6 +4,7 @@ __lua__
 --main
 
 day = 1
+money = 0
 
 function _init()
 	updates = {
@@ -21,7 +22,6 @@ function _init()
 		draw_order_screen
 	}
 	
-	
 	atn, atx = 0, 128
 	memset(0x8000, 0x44, 0x4000)
 	cls()
@@ -33,15 +33,15 @@ function _init()
 
 	start_field_screen()
 --	start_calendar_screen()
---	for i=1,30 do
---		local flower = generate_flower(0)
---		flower:set_growth_state(2,0)
---		add_flower_to_field(flower, fc_x, fc_y)
---		pick_flower_from_field()
---	end
+	for i=1,30 do
+		local flower = generate_flower(0)
+		flower:set_growth_state(2,0)
+		add_flower_to_field(flower, fc_x, fc_y)
+		pick_flower_from_field()
+	end
 --	start_genetics_screen(flower)
 --	start_inventory_screen(nil, true)
---	start_order_screen()
+	start_order_screen()
 end
 
 function _update()
@@ -321,8 +321,9 @@ function draw_field_screen()
 	clip()
 	camera()
 	draw_filled_rrect(
-		unpacks"96,2,31,9,0,0,15")
-	print("day "..day,98,4,0)
+		unpacks"76,2,51,16,0,0,15")
+	print("day "..day,78,4,0)
+	print("money $"..money,78,10)
 	draw_toolbar()
 	if not menu_is_open and not on_field then
 		draw_button_cursor()
@@ -1498,7 +1499,7 @@ function update_inventory_screen()
 			if btnp(⬅️) and selected > 0 then
 				inventory_row[2] -= 1
 				i_total_selected -= 1
-			elseif btnp(➡️) and selected < #lifespans and (not limit or i_total_selected < limit) then
+			elseif btnp(➡️) and selected < #lifespans and (not i_limit or i_total_selected < i_limit) then
 				inventory_row[2] += 1
 				i_total_selected += 1
 			end
@@ -1559,15 +1560,23 @@ end
 
 selector_sprs = {
 	split"24,25,26",
-	{},
+	{}, --no selectors for growth stage
 	split"28,29,30,31"
 }
 
+function create_order(order_str)
+	local order = {}
+	for s in all(split(order_str,"|")) do
+		add(order, split(s,";"))
+	end
+	add(order,{})
+	return order
+end
+
 function init_order_screen()
-	order = {
-		split("yellow tulips;1:0,3:2;0;10",";"),
-		split("purple primrose;1:1,3:3;0;5",";"),
-		{}
+	orders = {
+		create_order("tulips;1:0;0;5"),
+		create_order("yellow tulips;1:0,3:2;0;10|purple primrose;1:1,3:3;0;5")
 	}
 end
 
@@ -1575,11 +1584,20 @@ function resume_order_screen()
 	mode = 5
 end
 
+function select_order(i)
+	oc_max_x = #orders
+	if oc_max_x < 1 then
+		o_current_order = nil
+	else
+		oc_x, o_current_order = i, orders[i]
+		oc_y, oc_max_y = 1, #o_current_order
+	end
+end
+
 function start_order_screen(resume)
 	resume_order_screen()
-	oc_x,oc_y = 1,1
-	oc_max_y = 3
 	o_resume = resume
+	select_order(1)
 end
 
 function update_order_screen()
@@ -1588,11 +1606,18 @@ function update_order_screen()
 	end
 	if btnp(🅾️) then
 		if oc_y == oc_max_y then
-			-- do submit / payout etc
-			-- go to wherever we were before
-			o_resume()
+			-- todo: consider flower value in payout
+			local payout = 0
+			for order_row in all(o_current_order) do
+				if order_row[3] then
+					payout += order_row[3] * 100
+				end
+			end
+			money += payout
+			deli(orders,oc_x)
+			select_order(min(oc_x,#orders))
 		else
-			local order_row = order[oc_y]
+			local order_row = o_current_order[oc_y]
 			start_inventory_screen(function(selected_flowers)
 					order_row[3] += selected_flowers
 					resume_order_screen()
@@ -1603,20 +1628,29 @@ function update_order_screen()
 			)
 		end
 	end
-	_,oc_y = get_direction_input(0,oc_y,0,oc_max_y)
+	local new_oc_x
+	new_oc_x,oc_y = get_direction_input(oc_x,oc_y,oc_max_x,oc_max_y)
+	if new_oc_x != oc_x then
+		select_order(new_oc_x)
+	end
 end
 
 function draw_order_screen()
 	--draw frame
 	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
-	draw_order_screen_info()
-	draw_order_screen_cursor()
+	if o_current_order then
+		draw_order_screen_info()
+		draw_order_screen_cursor()
+	else
+		print("no orders available",5,4,0)
+	end
+	print("❎ close",90,118)
 end
 
 function draw_order_screen_info()
 	local i = 0
-	print("order no 1",5,4,0)
-	for order_row in all(order) do
+	print("order no "..oc_x,5,4,0)
+	for order_row in all(o_current_order) do
 		name,selector_str,filled,total = unpack(order_row)
 		i += 1
 		local y = -5 + i*21
@@ -1631,13 +1665,13 @@ function draw_order_screen_info()
 			print(filled.." / "..total,50, y)
 			print("fill",90,y)
 		else
-			print("submit",90,y+8)
+			print("deliver",90,y+8)
 		end
 	end
 end
 
 function draw_order_screen_cursor()
-	rect(88,1+oc_y*21,114,9+oc_y*21,0)
+	rect(88,1+oc_y*21,118,9+oc_y*21,0)
 end
 
 function make_selector_function(selector_str)
