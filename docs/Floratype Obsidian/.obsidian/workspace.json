@@ -55,12 +55,26 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Tech Debt.md",
+                "file": "Farmers Market Brainstorming.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Tech Debt"
+              "title": "Farmers Market Brainstorming"
+            }
+          },
+          {
+            "id": "453d9e9cd4aceaca",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Orders + Inventory Todo.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Orders + Inventory Todo"
             }
           },
           {
@@ -92,7 +106,7 @@
             }
           }
         ],
-        "currentTab": 3
+        "currentTab": 4
       }
     ],
     "direction": "vertical"
@@ -251,15 +265,16 @@
       "bases:Create new base": false
     }
   },
-  "active": "b59ccad4bcec1d0d",
+  "active": "453d9e9cd4aceaca",
   "lastOpenFiles": [
-    "Done/Memory and Sprite Management.md",
-    "Tech Debt.md",
-    "Gameplay Brainstorming.md",
     "Farmers Market Brainstorming.md",
+    "Orders + Inventory Todo.md",
+    "Future ideas.md",
+    "Gameplay Brainstorming.md",
+    "Tech Debt.md",
+    "Done/Memory and Sprite Management.md",
     "Untitled",
     "Calendar Improvement.md",
-    "Future ideas.md",
     "Done/Prototype.md",
     "Done/Bigger Fields.md",
     "Done",

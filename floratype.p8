@@ -16,12 +16,19 @@ function _init()
 	init_calendar_screen()
 	init_genetics_screen()
 	init_inventory_screen()
-	
+	init_order_screen()
+
 	start_field_screen()
 --	start_calendar_screen()
---	local flower = generate_flower(0)
---	add_flower_to_field(flower, 1, 1)
+--	for i=1,30 do
+--		local flower = generate_flower(0)
+--		flower:set_growth_state(2,0)
+--		add_flower_to_field(flower, fc_x, fc_y)
+--		pick_flower_from_field()
+--	end
 --	start_genetics_screen(flower)
+--	start_inventory_screen(nil, true)
+--	start_order_screen()
 end
 
 function _update()
@@ -37,6 +44,8 @@ function _update()
 			update_genetics_screen()
 		elseif mode == 4 then
 			update_inventory_screen()
+		elseif mode == 5 then
+			update_order_screen()
 		end
 	end
 end
@@ -50,6 +59,8 @@ function _draw()
 		draw_genetics_screen()
 	elseif mode == 4 then
 		draw_inventory_screen()
+	elseif mode == 5 then
+		draw_order_screen()
 	end
 	if menu_is_open then
 		draw_menu()
@@ -83,17 +94,16 @@ end
 -->8
 --utils
 
-function unpacks(s)
-	return unpack(split(s))
+function unpacks(s,separator)
+	return unpack(split(s,separator))
 end
 
-function count_table(t)
-	local c = 0
-	for _ in pairs(t) do
-		c += 1
+function left_pad(s,n)
+	s = tostr(s)
+	for i=1,n - #s do
+		s=" "..s
 	end
-	field_debug = c
-	return c
+	return s
 end
 
 function max_binary(size)
@@ -414,10 +424,12 @@ function click_button()
 						if i == 1 then
 							start_calendar_screen()
 						elseif i == 2 then
-							start_inventory_screen()
+							start_inventory_screen(resume_field_screen)
 						elseif i == 3 then
-							save_game()
+							start_order_screen(resume_field_screen)
 						elseif i == 4 then
+							save_game()
+						elseif i == 5 then
 							load_game()
 						end
 					end)
@@ -1282,11 +1294,12 @@ function open_options_menu(on_close)
 	options = {
 		split"56,calendar,1",
 		split"57,flowers,2",
-		split"58,save,3",
-		split"59,load,4",
+		split"58,orders,3",
+		split"59,save,4",
+		split"60,load,5",
 	}
-	menu_min_x,menu_min_y = 63,41
-	menu_w,menu_h = 55,69
+	menu_min_x,menu_min_y = 63,27
+	menu_w,menu_h = 55,83
 end
 
 function update_menu()
@@ -1448,45 +1461,200 @@ end
 
 --todo: save/load inventory
 
-harvested_flower_inventory = {}
-
 function init_inventory_screen()
-
+	harvested_flower_inventory = {}
 end
 
-function start_inventory_screen(flower)
+function start_inventory_screen(resume, select_mode, selector)
 	mode = 4
-	ic_x,ic_y = 1,1
-	ic_max_y = count_table(harvested_flower_inventory)
+	ic_y = 1
+	i_inventory = {}
+	for display_str,lifespans in pairs(harvested_flower_inventory) do
+		if not select_mode or selector(display_str) then
+			add(i_inventory, {display_str,0,lifespans})
+		end
+	end
+	if select_mode then
+		add(i_inventory, 0)
+	end
+	ic_max_y = #i_inventory
+	i_resume, i_select_mode = resume, select_mode
 end
 
 function update_inventory_screen()
 	if btnp(❎) then
-		resume_field_screen()
+		i_resume(0)
 	end
-	ic_x,ic_y = get_direction_input(ic_x,ic_y,1,ic_max_y)
+	if i_select_mode then
+		if ic_y == ic_max_y then
+			if btnp(🅾️) then
+				local total_selected = 0
+				for i = 1,ic_max_y - 1 do
+					local display_str,selected,lifespans = unpack(i_inventory[i])
+					total_selected += selected
+					if selected == #lifespans then
+						harvested_flower_inventory[display_str] = nil
+					else
+						remove_oldest_n(lifespans, selected)
+					end
+				end
+				i_resume(total_selected)
+			end
+		else
+			local _,selected,lifespans = unpack(i_inventory[ic_y])
+			if btnp(⬅️) then
+				selected -= 1
+			elseif btnp(➡️) then
+				selected += 1
+			end
+			i_inventory[ic_y][2] = mid(0,selected,#lifespans)
+		end
+	end
+	_,ic_y = get_direction_input(0,ic_y,0,ic_max_y)
 end
 
 function draw_inventory_screen()
 	--draw frame
 	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
 	draw_inventory_screen_info()
+	draw_inventory_screen_cursor()
 end
 
 function draw_inventory_screen_info()
-	local i = 0
-	print("harvested flowers",10,4,0)
 	palt(0b0000100000000000)
-	for display_str,lifespans in pairs(harvested_flower_inventory) do
-		i += 1
-		local y = -5 + i*18
-		create_flower_sprite(display_str)
-		spr(0, 10, y, 2, 2)
-		print("x"..#lifespans,30, y+4,0)
+	print("harvested flowers",10,4,0)
+	for i = 1,ic_max_y do
+		local y = -1 + i*18
+		if i_select_mode and i == ic_max_y then
+			print("submit",60,y)
+		else
+			display_str,selected,lifespans = unpack(i_inventory[i])
+			create_flower_sprite(display_str)
+			spr(0, 10, y-4, 2, 2)
+			local str = "   "
+			str ..= i_select_mode and left_pad(selected,2).."   / " or "   x  "
+			str ..= #lifespans
+			print(str,32,y,0)
+		end
 	end
 	palt()
 end
 
+function draw_inventory_screen_cursor()
+	if i_select_mode then
+		if ic_y == ic_max_y then
+			rect(58,-3+ic_y*18,84,5+ic_y*18,0)
+		else
+			print("⬅️  ➡️",36,-1 + ic_y*18)
+		end
+	end
+end
+
+function remove_oldest_n(lifespans, to_remove)
+	local removed = 0
+	for i = 1,4 do
+		for j = 1,min(to_remove - removed,count(lifespans,i)) do
+			del(lifespans,i)
+			removed += 1
+		end
+	end
+end
+
+-->8
+--order screen
+
+selector_sprs = {
+	split"24,25,26",
+	{},
+	split"28,29,30,31"
+}
+
+function init_order_screen()
+	order = {
+		split("yellow tulips;1:0,3:2;0;10",";"),
+		split("purple primrose;1:1,3:3;0;5",";"),
+		{}
+	}
+end
+
+function resume_order_screen()
+	mode = 5
+end
+
+function start_order_screen(resume)
+	resume_order_screen()
+	oc_x,oc_y = 1,1
+	oc_max_y = 3
+	o_resume = resume
+end
+
+function update_order_screen()
+	if btnp(❎) then
+		o_resume()
+	end
+	if btnp(🅾️) then
+		if oc_y == oc_max_y then
+			-- do submit / payout etc
+			-- go to wherever we were before
+			o_resume()
+		else
+			start_inventory_screen(function(selected_flowers)
+				order[oc_y][3] += selected_flowers
+				resume_order_screen()
+			end,
+			true,
+			make_selector_function(order[oc_y][2]))
+		end
+	end
+	_,oc_y = get_direction_input(0,oc_y,0,oc_max_y)
+end
+
+function draw_order_screen()
+	--draw frame
+	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
+	draw_order_screen_info()
+	draw_order_screen_cursor()
+end
+
+function draw_order_screen_info()
+	local i = 0
+	print("order no 1",5,4,0)
+	for order_row in all(order) do
+		name,selector_str,filled,total = unpack(order_row)
+		i += 1
+		local y = -5 + i*21
+		if name then
+			print(name,10,y,0)
+			y += 8
+			local selectors = split(selector_str)
+			for j=1,#selectors do
+				local cat,val = unpacks(selectors[j],":")
+				spr(selector_sprs[cat][val+1], 10*j, y-1)
+			end
+			print(filled.." / "..total,50, y)
+			print("fill",90,y)
+		else
+			print("submit",90,y+8)
+		end
+	end
+end
+
+function draw_order_screen_cursor()
+	rect(88,1+oc_y*21,114,9+oc_y*21,0)
+end
+
+function make_selector_function(selector_str)
+	local selectors = split(selector_str)
+	return function(display_str)
+		for i=1,#selectors do
+			local cat,val = unpacks(selectors[i],":")
+			if split(display_str)[cat] != val then
+				return
+			end
+		end
+		return true
+	end
+end
 __gfx__
 00000000000000004444f44477700000033000004466444400000000000000000044440004440066009999000000000000000000000000000000000000000000
 777777777777777744444444700000000000003346644444000000000000000004ffff4000400604097757900555555000000000000000000000000000000000
@@ -1496,14 +1664,14 @@ __gfx__
 7770077070700770444444f4000000000000033044444444000000000000000004f83f4066666004977777790555555000000000000000000000000000000000
 707070007070070744444444000000003300300044444444000000000000000004f33f4066666004097777900000000000000000000000000000000000000000
 77007770707007074444f44400000000000000034444444400000000000000000544445006660004009999000000000000000000000000000000000000000000
-70700070777007070000000044444444444444444444444400000000000000000080020000cccc00999999990000000000000000000000000000000000000000
-7070770007000777000000004444444444444444444b34440000000000000000008822000cccccc0099999900000000000000000000000000000000000000000
-000000000000000000000000444444444444444444b334440000000000000000088882200cc99cc0009999000000000000000000000000000000000000000000
-0000000000000000000000004444444444443b444b3344440000000000000000088888200cc99cc0009999000000000000000000000000000000000000000000
-0000000000000000000000004444b444444433bb333444440000000000000000088888800cccccc0009999000000000000000000000000000000000000000000
-777777777777777700000000444b344444444333b444444400000000000000000088880000cccc00000990000000000000000000000000000000000000000000
-00000000000000000000000044433444444444433444444400000000000000000003300000033000000330000000000000000000000000000000000000000000
-00000000000000000000000044533544444444533544444400000000000000000003300000033000000330000000000000000000000000000000000000000000
+70700070777007070000000044444444444444444444444400000000000000000080020000cccc00999999990000000000555500005555000055550000555500
+7070770007000777000000004444444444444444444b34440000000000000000008822000cccccc009999990000000000588885005cccc500599995005222250
+000000000000000000000000444444444444444444b334440000000000000000088882200cc99cc00099990000000000588888855cccccc55999999552222225
+0000000000000000000000004444444444443b444b3344440000000000000000088888200cc99cc00099990000000000588888855cccccc55999999552222225
+0000000000000000000000004444b444444433bb333444440000000000000000088888800cccccc00099990000000000588888855cccccc55999999552222225
+777777777777777700000000444b344444444333b444444400000000000000000088880000cccc000009900000000000588888855cccccc55999999552222225
+0000000000000000000000004443344444444443344444440000000000000000000330000003300000033000000000000588885005cccc500599995005222250
+00000000000000000000000044533544444444533544444400000000000000000003300000033000000330000000000000555500005555000055550000555500
 44444444444444444444444444444444444444444122444400000000000000000000066000f0f00000199c000000000000000000000000000000000000000000
 44444141141444444444444114444444444444441211244400000000000000000000466600f0f0f00001c0000000000000000000000000000000000000000000
 44444121121444444444112112114444444444441211124400000000000000000000406600f0f0f0000c10000000000000000000000000000000000000000000
@@ -1512,14 +1680,14 @@ __gfx__
 4444111112114444444111777711144444444441112444440000000000000000040000600ffffff00001c0000000000000000000000000000000000000000000
 44441111112144444441117777111444444444411244444400000000000000000400000000fffff0000c10000000000000000000000000000000000000000000
 444441111114444444442217712244444444444114444444000000000000000040000000000fff0000188c000000000000000000000000000000000000000000
-4444441111444444444411211211444444444443344b34440000000000000000eeeeeeee80020cccd6656d00ffff000000000000000000000000000000000000
-44444443344b344444441121121144444444444334b334440000000000000000eeeeeeee88220c9cd6656dd0ffffffff00000000000000000000000000000000
-4444444334b33444444444411444444444443b433b33444400000000000000006777777688820cccd6666dddf777777f00000000000000000000000000000000
-44443b433b3344444444444334b34444444433b33334444400000000000000006775577608800b00ddddddddf755557f00000000000000000000000000000000
-444433b33334444444443b433b33444444444333344444440000000000000000677757760030b000d666666df777777f00000000000000000000000000000000
-4444433334444444444433b33334444444444443344444440000000000000000677555760003b000d655556df755557f00000000000000000000000000000000
-444444433444444444444333344444444444444334444444000000000000000066777776000b3000d666666df777777f00000000000000000000000000000000
-444444533544444444444453354444444444445335444444000000000000000056666666000b0300d666666dffffffff00000000000000000000000000000000
+4444441111444444444411211211444444444443344b34440000000000000000eeeeeeee80020ccc0ffffff0d6656d00ffff0000000000000000000000000000
+44444443344b344444441121121144444444444334b334440000000000000000eeeeeeee88220c9c0f5f55f0d6656dd0ffffffff000000000000000000000000
+4444444334b33444444444411444444444443b433b33444400000000000000006777777688820ccc0ffffff0d6666dddf777777f000000000000000000000000
+44443b433b3344444444444334b34444444433b33334444400000000000000006775577608800b000f5f55f0ddddddddf755557f000000000000000000000000
+444433b33334444444443b433b33444444444333344444440000000000000000677757760030b0000ffffff0d666666df777777f000000000000000000000000
+4444433334444444444433b33334444444444443344444440000000000000000677555760003b0000ff555f0d655556df755557f000000000000000000000000
+444444433444444444444333344444444444444334444444000000000000000066777776000b30000ffffff0d666666df777777f000000000000000000000000
+444444533544444444444453354444444444445335444444000000000000000056666666000b03000ffffff0d666666dffffffff000000000000000000000000
 __label__
 7774f4444444f7774444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f4444444f444
 74444444444444474444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444

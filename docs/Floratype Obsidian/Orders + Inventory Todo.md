@@ -1,0 +1,10 @@
+- [ ] Can't overfill orders
+- [ ] Orders reward money
+- [ ] Save/load inventory + orders
+- [ ] Notifications/toasts (flowers expired)
+- [ ] Multiple Orders exists + are visible at a time
+- [ ] Orders with a due date
+- [ ] Orders appear in advance on calendar
+- [ ] Scrolling on inventory screen
+- [ ] Calculate variable order price
+-
