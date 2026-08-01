@@ -2,7 +2,7 @@
 - [x] Orders reward money
 - [x] Handle multiple orders, and delivering order removes it
 - [ ] Save/load inventory + orders + money
-- [ ] Notifications/toasts (flowers expired, money earned)
+- [x] Notifications/toasts (flowers expired, money earned)
 - [x] Orders with a due date
 - [ ] Orders appear in advance on calendar
 - [ ] Scrolling on inventory screen
