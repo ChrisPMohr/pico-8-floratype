@@ -1575,8 +1575,8 @@ end
 
 function init_order_screen()
 	orders = {
-		create_order("tulips;1:0;0;5"),
-		create_order("yellow tulips;1:0,3:2;0;10|purple primrose;1:1,3:3;0;5")
+		create_order("1;15|tulips;1:0;0;5"),
+		create_order("2;23|yellow tulips;1:0,3:2;0;10|purple primrose;1:1,3:3;0;5")
 	}
 end
 
@@ -1589,8 +1589,9 @@ function select_order(i)
 	if oc_max_x < 1 then
 		o_current_order = nil
 	else
-		oc_x, o_current_order = i, orders[i]
-		oc_y, oc_max_y = 1, #o_current_order
+		oc_order_num, oc_due_date = unpack(orders[i][1])
+		o_current_order = pack(unpack(orders[i],2))
+		oc_x, oc_y, oc_max_y = i, 1, #o_current_order
 	end
 end
 
@@ -1649,11 +1650,12 @@ end
 
 function draw_order_screen_info()
 	local i = 0
-	print("order no "..oc_x,5,4,0)
+	print("order no "..oc_order_num,5,4,0)
+	print("due on day "..oc_due_date,5,10,0)
 	for order_row in all(o_current_order) do
 		name,selector_str,filled,total = unpack(order_row)
 		i += 1
-		local y = -5 + i*21
+		local y = 1 + i*21
 		if name then
 			print(name,10,y,0)
 			y += 8
@@ -1671,7 +1673,7 @@ function draw_order_screen_info()
 end
 
 function draw_order_screen_cursor()
-	rect(88,1+oc_y*21,118,9+oc_y*21,0)
+	rect(88,7+oc_y*21,118,15+oc_y*21,0)
 end
 
 function make_selector_function(selector_str)
