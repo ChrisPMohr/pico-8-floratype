@@ -61,15 +61,21 @@ function _draw()
 	end
 end
 
-save_magic_number = 0xac01
+--fLORaTYPE version 1
+save_magic_number = 0xfa01
 
 function save_game()
-	--sync field state to sprite memory
-	--save to cart
-	--reserve the first 4 bytes for future use
+	--copy save state to memory and then copy to cart
+	--save first 2 bytes to confirm save version matches
 	poke2(0x1000,save_magic_number)
-	poke(0x1002,day)
-	local end_addr = field1:save(0x1004)
+	--save data to fixed addresses
+	poke2(0x1002,day)
+	poke2(0x1004,money)
+	--save data of dynamic sizes
+	local end_addr = field1:save(0x1006)
+	end_addr = save_inventory(end_addr)
+--	save_orders(end_addr)
+	--finished building save
 	assert(end_addr < 0x2000,"tried to save too much memory "..end_addr)
 	
 	cstore(0x1000,0x1000,0x1000,"floratype_save.p8")
@@ -78,8 +84,15 @@ end
 function load_game()
 	reload(0x1000,0x1000,0x1000,"floratype_save.p8")
 	if %0x1000 == save_magic_number then
-		day = @0x1002
-		field1 = field_class:load(0x1004)
+		--load data from fixed addressed
+		day = %0x1002
+		money = %0x1004
+		--load data of dynamic sizes
+		local end_addr
+		field1, end_addr = field_class:load(0x1006)
+		end_addr = load_inventory(end_addr)
+--		load_order(end_addr)
+		--finished loading
 		init_field_screen()
 		sync_flower_sprites()
 	end
@@ -126,7 +139,41 @@ function get_direction_input(x,y,x_max,y_max)
 	return mid(1,x,x_max), mid(1,y,y_max)
 end
 
+function save_nums(nums, addr)
+	--save sequence of ints 0-255
+	local len = #nums
+	poke(addr, len)
+	addr += 1
+	poke(addr, unpack(nums))
+	return addr + len
+end
 
+function save_string(s, addr)
+	return save_nums(pack(ord(s,1,#s)), addr)
+	
+	--previous version in case we remove save_nums
+--	local len = #nums
+--	poke(addr, len)
+--	addr += 1
+--	poke(addr, ord(s,1,len))
+--	return addr + len
+end
+
+function load_nums(addr)
+	local len = @addr
+	addr += 1
+	return pack(peek(addr, len)), addr + len
+end
+
+function load_string(addr)
+	local chrs, addr = load_nums(addr)
+	return chr(unpack(chrs)), addr
+	
+	--previous version in case we remove load_nums
+--	local len = @addr
+--	addr += 1
+--	return chr(peek(addr, len)), addr + len
+end
 
 -- copies a sprite from x0,y0
 --   (from spritesheet based at
@@ -184,6 +231,26 @@ function field_class:new(n)
 		self)
 end
 
+--save and load rely on fixed dimension for field
+function field_class:save(addr)
+	for y = 1,f_max_y do
+		for x = 1,f_max_x do
+			local f = self:get(x,y)
+			local bytes
+			if f then
+				bytes = {f.chr1, f.chr2}
+			else
+				bytes = empty_flower_magic_numbers
+			end
+			for b in all(bytes) do
+				poke4(addr, b)
+				addr += 4
+			end
+		end
+	end
+	return addr
+end
+
 function field_class:load(addr)
 	local field = field_class:new(1)
 	for y = 1,f_max_y do
@@ -222,26 +289,6 @@ function field_class:set_weeds(v,x,y)
 	if check_field_bounds(x,y) then
 		self.weeds[y][x] = v
 	end
-end
-
-
-function field_class:save(addr)
-	for y = 1,f_max_y do
-		for x = 1,f_max_x do
-			local f = self:get(x,y)
-			local bytes
-			if f then
-				bytes = {f.chr1, f.chr2}
-			else
-				bytes = empty_flower_magic_numbers
-			end
-			for b in all(bytes) do
-				poke4(addr, b)
-				addr += 4
-			end
-		end
-	end
-	return addr
 end
 
 --this assumes the same max dimensions
@@ -1469,7 +1516,29 @@ end
 -->8
 --flower inventory screen
 
---todo: save/load inventory
+function save_inventory(addr)
+	local start_addr, inventory_size = addr, 0
+	addr += 1
+	for display_str,lifespans in pairs(harvested_flower_inventory) do
+		inventory_size += 1
+		addr = save_string(display_str, addr)
+		addr = save_nums(lifespans, addr)
+	end
+	poke(start_addr, inventory_size)
+	return addr
+end
+
+function load_inventory(addr)
+	local inventory_size,display_string,lifespans = @addr
+	addr += 1
+	harvested_flower_inventory = {}
+	for i=1,inventory_size do
+		display_string, addr = load_string(addr)
+		lifespans, addr = load_nums(addr)
+		harvested_flower_inventory[display_string] = lifespans
+	end
+	return addr
+end
 
 function init_inventory_screen()
 	harvested_flower_inventory = {}
