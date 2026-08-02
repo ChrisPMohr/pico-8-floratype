@@ -1,3 +1,4 @@
 - [ ] Move f_max_x/y to the field object - supports multiple fields
 - [ ] Can we use sspr instead of map to draw flower sprites to the screen?
 - [ ] Try updating inventory lifespans to be table of time: count instead of a sequence of time. Check how this impacts token usage
+- [ ] Try saving tokens on save/load by keeping addr as a global variable

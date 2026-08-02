@@ -32,13 +32,15 @@ function _init()
 	init_order_screen()
 
 	start_field_screen()
---	start_calendar_screen()
---	for i=1,100 do
+	-- add a bunch of flowers to
+	-- inventory for testing
+--	for i=1,200 do
 --		local flower = generate_flower(flr(rnd(3)))
 --		flower:set_growth_state(2,0)
 --		add_flower_to_field(flower, fc_x, fc_y)
 --		pick_flower_from_field()
 --	end
+--	start_calendar_screen()
 --	start_genetics_screen(flower)
 --	start_inventory_screen(nil, true)
 --	start_order_screen()
@@ -74,7 +76,7 @@ function save_game()
 	--save data of dynamic sizes
 	local end_addr = field1:save(0x1006)
 	end_addr = save_inventory(end_addr)
---	save_orders(end_addr)
+	save_orders(end_addr)
 	--finished building save
 	assert(end_addr < 0x2000,"tried to save too much memory "..end_addr)
 	
@@ -91,7 +93,7 @@ function load_game()
 		local end_addr
 		field1, end_addr = field_class:load(0x1006)
 		end_addr = load_inventory(end_addr)
---		load_order(end_addr)
+		load_orders(end_addr)
 		--finished loading
 		init_field_screen()
 		sync_flower_sprites()
@@ -139,40 +141,36 @@ function get_direction_input(x,y,x_max,y_max)
 	return mid(1,x,x_max), mid(1,y,y_max)
 end
 
-function save_nums(nums, addr)
+function save_num(addr, n)
+	poke(addr, n)
+	return addr+1,n
+end
+
+function save_nums(addr, nums)
 	--save sequence of ints 0-255
-	local len = #nums
-	poke(addr, len)
-	addr += 1
+	local len
+	addr, len = save_num(addr, #nums)
 	poke(addr, unpack(nums))
 	return addr + len
 end
 
-function save_string(s, addr)
-	return save_nums(pack(ord(s,1,#s)), addr)
-	
-	--previous version in case we remove save_nums
---	local len = #nums
---	poke(addr, len)
---	addr += 1
---	poke(addr, ord(s,1,len))
---	return addr + len
+function save_string(addr, s)
+	return save_nums(addr, pack(ord(s,1,#s)))
+end
+
+function load_num(addr)
+	return @addr, addr+1
 end
 
 function load_nums(addr)
-	local len = @addr
-	addr += 1
+	local len
+	len, addr = load_num(addr)
 	return pack(peek(addr, len)), addr + len
 end
 
 function load_string(addr)
 	local chrs, addr = load_nums(addr)
 	return chr(unpack(chrs)), addr
-	
-	--previous version in case we remove load_nums
---	local len = @addr
---	addr += 1
---	return chr(peek(addr, len)), addr + len
 end
 
 -- copies a sprite from x0,y0
@@ -206,7 +204,7 @@ end
 field_class = {}
 field_class.__index = field_class
 
-empty_flower_magic_numbers = {0xbaaa.aaad, 0x0}
+empty_flower_magic_number = 0xbaaa.aaad
 
 function field_class:new(n)
 	local flowers, weeds = {}, {}
@@ -236,16 +234,12 @@ function field_class:save(addr)
 	for y = 1,f_max_y do
 		for x = 1,f_max_x do
 			local f = self:get(x,y)
-			local bytes
 			if f then
-				bytes = {f.chr1, f.chr2}
+				poke4(addr, f.chr1, f.chr2)
 			else
-				bytes = empty_flower_magic_numbers
+				poke4(addr, empty_flower_magic_number, 0)
 			end
-			for b in all(bytes) do
-				poke4(addr, b)
-				addr += 4
-			end
+			addr += 8
 		end
 	end
 	return addr
@@ -256,7 +250,7 @@ function field_class:load(addr)
 	for y = 1,f_max_y do
 		for x = 1,f_max_x do
 			local data1,data2 = $addr, $(addr+4)
-			if data1 != empty_flower_magic_numbers[1] then
+			if data1 != empty_flower_magic_number then
 				field:place(
 					flower_class:new(
 						data1,data2),
@@ -1521,16 +1515,16 @@ function save_inventory(addr)
 	addr += 1
 	for display_str,lifespans in pairs(harvested_flower_inventory) do
 		inventory_size += 1
-		addr = save_string(display_str, addr)
-		addr = save_nums(lifespans, addr)
+		addr = save_string(addr, display_str)
+		addr = save_nums(addr, lifespans)
 	end
 	poke(start_addr, inventory_size)
 	return addr
 end
 
 function load_inventory(addr)
-	local inventory_size,display_string,lifespans = @addr
-	addr += 1
+	local inventory_size,display_string,lifespans
+	inventory_size, addr = load_num(addr)
 	harvested_flower_inventory = {}
 	for i=1,inventory_size do
 		display_string, addr = load_string(addr)
@@ -1661,19 +1655,59 @@ selector_sprs = {
 	split"28,29,30,31"
 }
 
-function create_order(order_str)
-	local order = {}
-	for s in all(split(order_str,"|")) do
-		add(order, split(s,";"))
+function save_orders(addr)
+	local start_addr = addr
+	addr += 1
+	for order in all(orders) do
+		addr = save_num(addr, order.metadata[1])
+		--don't need to save number of rows
+		--since that should be consistent
+		--between saves
+		for row in all(order.rows) do
+			addr = save_num(addr, row[4])
+		end
 	end
-	add(order,{})
+	poke(start_addr, #orders)
+	return addr
+end
+
+function load_orders(addr)
+	local orders_size
+	orders_size, addr = load_num(addr)
+	orders = {}
+	for i=1,orders_size do
+		order_num, addr = load_num(addr)
+		local order = create_order(all_orders[order_num])
+		for row in all(order.rows) do
+			row[4], addr = load_num(addr)
+		end
+		add(orders, order)
+	end
+	return addr
+end
+
+function create_order(order_str)
+	local parts = split(order_str,"|")
+	local order = {
+		rows={},
+		metadata=unpack(parts,1,1)
+	}
+	for s in all(pack(unpack(parts,2))) do
+		add(order.rows,split(s,";"))
+	end
+	add(order.rows,{})
 	return order
 end
 
 function init_order_screen()
+	all_orders = {
+		"1;15|tulips;1:0;5;0",
+		"2;23|yellow tulips;1:0,3:2;10;0|purple primrose;1:1,3:3;5;0"
+	}
+	--for testing, start with these two orders
 	orders = {
-		create_order("1;15|tulips;1:0;0;5"),
-		create_order("2;23|yellow tulips;1:0,3:2;0;10|purple primrose;1:1,3:3;0;5")
+		create_order(all_orders[1]),
+		create_order(all_orders[2])
 	}
 end
 
@@ -1684,11 +1718,11 @@ end
 function select_order(i)
 	oc_max_x = #orders
 	if oc_max_x < 1 then
-		o_current_order = nil
+		o_order_rows = nil
 	else
-		oc_order_num, oc_due_date = unpack(orders[i][1])
-		o_current_order = pack(unpack(orders[i],2))
-		oc_x, oc_y, oc_max_y = i, 1, #o_current_order
+		o_order_rows = orders[i].rows
+		o_order_num, o_due_date = unpacks(orders[i].metadata,";")
+		oc_x, oc_y, oc_max_y = i, 1, #o_order_rows
 	end
 end
 
@@ -1702,13 +1736,13 @@ function update_order_screen()
 	if btnp(❎) then
 		o_resume()
 	end
-	if btnp(🅾️) then
+	if o_order_rows and btnp(🅾️) then
 		if oc_y == oc_max_y then
 			-- todo: consider flower value in payout
 			local payout = 0
-			for order_row in all(o_current_order) do
-				if order_row[3] then
-					payout += order_row[3] * 100
+			for order_row in all(o_order_rows) do
+				if order_row[4] then
+					payout += order_row[4] * 100
 				end
 			end
 			open_toast_menu(
@@ -1719,13 +1753,13 @@ function update_order_screen()
 					select_order(min(oc_x,#orders))
 				end)
 		else
-			local order_row = o_current_order[oc_y]
+			local order_row = o_order_rows[oc_y]
 			start_inventory_screen(function(selected_flowers)
-					order_row[3] += selected_flowers
+					order_row[4] += selected_flowers
 					resume_order_screen()
 				end,
 				true,
-				order_row[4] - order_row[3],
+				order_row[3] - order_row[4],
 				make_selector_function(order_row[2])
 			)
 		end
@@ -1740,25 +1774,32 @@ end
 function draw_order_screen()
 	--draw frame
 	draw_filled_rrect(unpacks"0,0,128,128,0,4,15")
-	if o_current_order then
+	if o_order_rows then
 		draw_order_screen_info()
 		draw_order_screen_cursor()
 	else
-		print("no orders available",5,4,0)
+		print(unpacks"no orders available,5,4,0")
 	end
-	print("❎ close",90,118)
+	print(unpacks"❎ close,90,118")
 end
 
 function draw_order_screen_info()
 	local i = 0
-	print("order no "..oc_order_num,5,4,0)
-	print("due on day "..oc_due_date,5,10,0)
-	for order_row in all(o_current_order) do
-		name,selector_str,filled,total = unpack(order_row)
-		i += 1
+	if o_order_num > 1 then
+		print(unpacks"⬅️,5,4,0")
+	end
+	if o_order_num < #orders then
+		print(unpacks"➡️,118,4,0")
+	end
+	print(
+		"order no "..o_order_num..
+		"\ndue on day "..o_due_date,
+		15,4,0)
+	for i=1,oc_max_y do
+		name,selector_str,total,filled = unpack(o_order_rows[i])
 		local y = 1 + i*21
 		if name then
-			print(name,10,y,0)
+			print(name,10,y)
 			y += 8
 			local selectors = split(selector_str)
 			for j=1,#selectors do

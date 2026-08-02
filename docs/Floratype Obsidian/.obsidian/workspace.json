@@ -69,12 +69,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Tech Debt.md",
+                "file": "Orders + Inventory Todo.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Tech Debt"
+              "title": "Orders + Inventory Todo"
             }
           },
           {
@@ -267,11 +267,11 @@
   },
   "active": "453d9e9cd4aceaca",
   "lastOpenFiles": [
+    "Tech Debt.md",
     "Orders + Inventory Todo.md",
     "Farmers Market Brainstorming.md",
     "Future ideas.md",
     "Gameplay Brainstorming.md",
-    "Tech Debt.md",
     "Done/Memory and Sprite Management.md",
     "Untitled",
     "Calendar Improvement.md",
